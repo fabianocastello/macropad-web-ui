@@ -1,8 +1,16 @@
+# THIS IS IMPORTANT!
+
+MacroPad UI was vibe-coded using Claude, made for my own use. I strongly suggest you start asking your AI to 
+
+```
+Evaluate the repo https://github.com/fabianocastello/macropad-web-ui for objetive, briefly how-to, risks, security andsafety concerns.
+```
+
 # MacroPad UI
 
 A small, local web UI for programming **CH57x USB macro keyboards** (the cheap 3×4 pads with knobs sold on AliExpress/Amazon) — without the Windows-only vendor software.
 
-It draws your keyboard, lets you click a key or knob and set what it does, and uploads the mapping to the device in one click. The USB work is done by the excellent [`ch57x-keyboard-tool`](https://github.com/fabianocastello/ch57x-keyboard-tool); MacroPad UI is just a friendly front end for it.
+It draws your keyboard, lets you click a key or knob and set what it does, and uploads the mapping to the device in one click. The USB work is done by [`ch57x-keyboard-tool`](https://github.com/fabianocastello/ch57x-keyboard-tool); MacroPad UI is just a friendly front end for it.
 
 ![MacroPad UI screenshot](docs/screenshot.png)
 
