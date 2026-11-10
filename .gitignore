@@ -4,3 +4,6 @@ __pycache__/
 build/
 bin/
 last_upload.yaml
+
+# Reference material (never commit)
+_Reference*/
