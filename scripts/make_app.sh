@@ -42,6 +42,7 @@ on run
 	set resDir to POSIX path of (path to me) & "Contents/Resources/macropad_ui"
 	set pyPath to "@PY@"
 	set toolPath to "@TOOL@"
+	if toolPath is "BUNDLED" then set toolPath to POSIX path of (path to me) & "Contents/Resources/ch57x-keyboard-tool"
 	set portNum to "@PORT@"
 	set serverOn to true
 	try
@@ -59,7 +60,8 @@ on run
 	open location "http://127.0.0.1:" & portNum
 end run
 AS
-"$PY" - "$WORK/launcher.applescript" "$PY" "$TOOL" "$PORT" <<'PYEOF'
+TOOL_ARG=""; [ -n "$TOOL" ] && TOOL_ARG="BUNDLED"
+"$PY" - "$WORK/launcher.applescript" "$PY" "$TOOL_ARG" "$PORT" <<'PYEOF'
 import sys
 p, py, tool, port = sys.argv[1:5]
 s = open(p).read().replace("@PY@", py).replace("@TOOL@", tool).replace("@PORT@", port)
@@ -67,7 +69,10 @@ open(p, "w").write(s)
 PYEOF
 osacompile -o "$APP" "$WORK/launcher.applescript"
 
-# 2) bundle the server + UI inside the app
+# 2) bundle the server + UI (and the tool, if found) inside the app, so it is self-contained
+if [ -n "$TOOL" ]; then
+  cp "$TOOL" "$APP/Contents/Resources/ch57x-keyboard-tool"
+fi
 rsync -a --exclude '__pycache__' "$ROOT/macropad_ui/" "$APP/Contents/Resources/macropad_ui/"
 
 # 3) icon
@@ -77,6 +82,10 @@ for s in 16 32 128 256 512; do
   sips -z $((s*2)) $((s*2)) "$ROOT/assets/icon.png" --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/applet.icns"
+# osacompile adds a default asset-catalog icon that can override applet.icns: remove it
+/usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$APP/Contents/Info.plist" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile applet" "$APP/Contents/Info.plist" 2>/dev/null || true
+rm -f "$APP/Contents/Resources/Assets.car"
 touch "$APP"
 codesign --force --deep -s - "$APP" >/dev/null 2>&1 || true
 
