@@ -2,7 +2,7 @@
 """MacroPad UI - a local web UI for programming CH57x macro keyboards.
 
 It wraps the command-line tool `ch57x-keyboard-tool`
-(https://github.com/kriomant/ch57x-keyboard-tool), which does the actual USB work.
+(https://github.com/fabianocastello/ch57x-keyboard-tool), which does the actual USB work.
 
 Usage:
     python3 server.py [--port 8777] [--no-open] [--tool PATH] [--configs DIR]

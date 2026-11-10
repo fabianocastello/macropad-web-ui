@@ -2,7 +2,7 @@
 
 A small, local web UI for programming **CH57x USB macro keyboards** (the cheap 3×4 pads with knobs sold on AliExpress/Amazon) — without the Windows-only vendor software.
 
-It draws your keyboard, lets you click a key or knob and set what it does, and uploads the mapping to the device in one click. The USB work is done by the excellent [`ch57x-keyboard-tool`](https://github.com/kriomant/ch57x-keyboard-tool); MacroPad UI is just a friendly front end for it.
+It draws your keyboard, lets you click a key or knob and set what it does, and uploads the mapping to the device in one click. The USB work is done by the excellent [`ch57x-keyboard-tool`](https://github.com/fabianocastello/ch57x-keyboard-tool); MacroPad UI is just a friendly front end for it.
 
 ![MacroPad UI screenshot](docs/screenshot.png)
 
@@ -24,7 +24,7 @@ It draws your keyboard, lets you click a key or knob and set what it does, and u
 
 - macOS (tested). Linux should work for the UI + tool; Windows is untested.
 - Python 3.8+ and PyYAML: `pip3 install -r requirements.txt`
-- [`ch57x-keyboard-tool`](https://github.com/kriomant/ch57x-keyboard-tool) — grab a binary from its [releases](https://github.com/kriomant/ch57x-keyboard-tool/releases) or `cargo install ch57x-keyboard-tool`.
+- [`ch57x-keyboard-tool`](https://github.com/fabianocastello/ch57x-keyboard-tool) — build it from that repository (`cargo install --git https://github.com/fabianocastello/ch57x-keyboard-tool`).
   MacroPad UI looks for it in `$MACROPAD_TOOL`, `./bin/`, your `PATH`, `~/.cargo/bin`, `/opt/homebrew/bin`, `/usr/local/bin` (or pass `--tool PATH`).
 - A supported keyboard (USB IDs `1189:8840`, `1189:8842`, `1189:8890`), connected with a **USB cable** (also for Bluetooth models).
 
@@ -74,6 +74,6 @@ See [ROADMAP.md](ROADMAP.md) for what's planned.
 
 ## Credits & license
 
-- [`ch57x-keyboard-tool`](https://github.com/kriomant/ch57x-keyboard-tool) by kriomant does all the keyboard communication (MIT / Apache-2.0).
+- [`ch57x-keyboard-tool`](https://github.com/fabianocastello/ch57x-keyboard-tool) (a fork of the original by kriomant, MIT / Apache-2.0) does all the keyboard communication.
 - MacroPad UI is released under the [MIT license](LICENSE).
 - Not affiliated with any keyboard manufacturer. You flash key mappings at your own risk.
