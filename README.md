@@ -52,7 +52,7 @@ Rebuild it if you move or reinstall Python or the tool.
 
 1. Pick a config, click a key or knob, set its function (raw value, text, chord builder, mouse, media).
 2. Check the green **valid** badge, then **Upload to keyboard**.
-3. On macOS the tool needs administrator rights to talk to the keyboard, so a password dialog appears. If it fails, the log shows the exact `sudo …` command to run in Terminal instead.
+3. On macOS the tool needs administrator rights to talk to the keyboard, so a native password dialog appears (it works no matter how you started the server: MacroPad UI opens a tiny helper app, `MacroPad Uploader.app`, in your graphical session).
 
 Good to know:
 
@@ -66,9 +66,8 @@ Good to know:
 
 | Message | Meaning |
 | --- | --- |
-| `Access denied (insufficient permissions)` | The tool needs admin rights. Use the password dialog, or run the `sudo` command shown in the log. |
-| `The administrator user name or password was incorrect (-60007)` | Wrong password in the macOS dialog (Touch ID isn't accepted there), or the server wasn't started from a GUI session (start it from Terminal or the `.app`, not as a background service). |
-| Upload fails and **no password dialog appears** | The server was started outside a graphical session (e.g. from an IDE or agent shell). Start it from **Terminal.app**, or run the `sudo …` command shown in the red message. |
+| `Access denied (insufficient permissions)` | The tool needs admin rights. MacroPad UI then shows the macOS password dialog; enter your Mac password. |
+| `The administrator user name or password was incorrect` | Wrong password in the macOS dialog (Touch ID isn't accepted there). Try again. |
 | `keyboard not found` | Cable not connected, or a model with other USB IDs (see the tool's README). |
 
 See [ROADMAP.md](ROADMAP.md) for what's planned.

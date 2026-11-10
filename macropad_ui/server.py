@@ -14,7 +14,6 @@ import json
 import os
 import platform
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -187,37 +186,92 @@ def list_keys():
     return sections
 
 
-def gui_session():
-    """macOS only: the admin password dialog needs a graphical (Aqua) session."""
+# AppleScript applet that asks for the admin password in the user's graphical session.
+# It is launched with `open -W`, which works even when this server was started from a non-GUI shell.
+# The tool path is baked in at build time; the job file only carries the operation and a data file path.
+HELPER_SRC = r'''on run
+	set jobFile to "@JOB@"
+	set resFile to "@RES@"
+	set toolPath to "@TOOL@"
+	set job to do shell script "/bin/cat " & quoted form of jobFile
+	set op to paragraph 1 of job
+	set arg to paragraph 2 of job
+	set code to 0
+	set out to ""
+	try
+		if op is "upload" then
+			set out to do shell script quoted form of toolPath & " --vendor-id 0x1189 upload " & quoted form of arg & " 2>&1" with administrator privileges
+		else if op is "led" and arg is in {"0", "1", "2", "3"} then
+			set out to do shell script quoted form of toolPath & " --vendor-id 0x1189 led " & arg & " 2>&1" with administrator privileges
+		else if op is "ping" then
+			set out to do shell script "/bin/echo pong; /bin/launchctl managername"
+		else
+			error "unsupported operation" number 2
+		end if
+	on error errMsg number errNum
+		set code to errNum
+		set out to errMsg
+	end try
+	do shell script "/usr/bin/printf '%s\\n%s' " & code & " " & quoted form of out & " > " & quoted form of resFile
+end run
+'''
+HELPER_VERSION = "1"
+
+
+def as_escape(x):
+    return str(x).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def ensure_helper():
+    """Build (once) the graphical helper app inside the data folder."""
+    app = DATA / "MacroPad Uploader.app"
+    stamp = DATA / ".helper-stamp"
+    expected = f"{HELPER_VERSION}|{TOOL}"
+    if app.exists() and stamp.exists() and stamp.read_text() == expected:
+        return app
+    shutil.rmtree(app, ignore_errors=True)
+    src = (HELPER_SRC.replace("@JOB@", as_escape(DATA / "job.txt")).replace("@RES@", as_escape(DATA / "result.txt"))
+           .replace("@TOOL@", as_escape(TOOL)))
+    with tempfile.TemporaryDirectory() as d:
+        f = Path(d) / "helper.applescript"
+        f.write_text(src)
+        r = subprocess.run(["osacompile", "-o", str(app), str(f)], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.strip() or "osacompile failed")
+    stamp.write_text(expected)
+    return app
+
+
+def helper_run(op, arg=""):
+    """Run `op` through the graphical helper. Returns (exit_code, output)."""
     if SYSTEM != "Darwin":
-        return True
+        return 1, "Administrator prompt is only implemented for macOS."
     try:
-        return subprocess.run(["launchctl", "managername"], capture_output=True, text=True, timeout=5).stdout.strip() == "Aqua"
-    except Exception:
-        return True
-
-
-def mac_admin_run(args):
-    """Run the tool with administrator rights through the native macOS password dialog."""
-    cmd = shlex.quote(str(TOOL)) + " --vendor-id " + VENDOR + " " + " ".join(shlex.quote(a) for a in args) + " 2>&1"
-    script = f"do shell script {q(cmd)} with administrator privileges"
-    p = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=120)
-    return p.returncode, (p.stdout + p.stderr).strip()
+        app = ensure_helper()
+        job, res = DATA / "job.txt", DATA / "result.txt"
+        job.write_text(f"{op}\n{arg}\n")
+        res.unlink(missing_ok=True)
+        subprocess.run(["open", "-W", "-n", str(app)], timeout=300)
+        lines = res.read_text().split("\n", 1)
+        code, out = int(lines[0]), (lines[1] if len(lines) > 1 else "").strip()
+    except subprocess.TimeoutExpired:
+        return 124, "Timed out waiting for the password dialog."
+    except Exception as e:
+        return 1, f"Could not open the password dialog: {e}"
+    if code == -128:
+        return 1, "Cancelled."
+    return code, out
 
 
 def privileged(args, text=None):
-    """Try without privileges first; on a permission error, escalate (macOS dialog)."""
-    code, out = run_tool(["--vendor-id", VENDOR, *args[:1], *(args[1:] if text is None else [])],
-                         stdin=text)
+    """Try without privileges first; on a permission error, ask for the admin password graphically (macOS)."""
+    code, out = run_tool(["--vendor-id", VENDOR, *args[:1], *(args[1:] if text is None else [])], stdin=text)
     if code != 0 and PERM_RE.search(out) and SYSTEM == "Darwin" and TOOL is not None:
-        if text is None:
-            return mac_admin_run(args)
-        with tempfile.TemporaryDirectory() as d:
-            f = Path(d) / "upload.yaml"
+        if text is not None:
+            f = DATA / "upload.yaml"
             f.write_text(text)
-            f.chmod(0o644)
-            Path(d).chmod(0o755)
-            return mac_admin_run([args[0], str(f)])
+            return helper_run("upload", str(f))
+        return helper_run("led", args[1])
     return code, out
 
 
@@ -319,18 +373,11 @@ class Handler(BaseHTTPRequestHandler):
                 resp = {"ok": code == 0, "message": out}
                 if code == 0:
                     resp["code"] = "uploaded"
-                else:
-                    resp["gui"] = gui_session()
-                if code != 0 and TOOL is not None:
-                    last = DATA / "last_upload.yaml"
-                    last.write_text(text)
-                    resp["terminal_cmd"] = f"sudo {shlex.quote(str(TOOL))} --vendor-id {VENDOR} upload {shlex.quote(str(last))}"
                 return self._send(resp)
             if path == "/api/led":
                 idx = int(data.get("index", 0))
                 code, out = privileged(["led", str(idx)])
-                return self._send({"ok": code == 0, "message": out, "code": "led_set" if code == 0 else None, "index": idx,
-                                   **({"gui": gui_session()} if code != 0 else {})})
+                return self._send({"ok": code == 0, "message": out, "code": "led_set" if code == 0 else None, "index": idx})
         except (KeyError, TypeError, ValueError) as e:
             return self._err("bad_request", f"Bad request: {e}")
         self._err("not_found", "not found", 404)
@@ -358,9 +405,6 @@ def main():
     print(f"MacroPad UI running at {url}  (Ctrl+C to quit)")
     print(f"  tool:    {TOOL or 'NOT FOUND - install ch57x-keyboard-tool or set MACROPAD_TOOL'}")
     print(f"  configs: {CONFIGS}")
-    if not gui_session():
-        print("  WARNING: not running in a graphical session - the macOS password dialog cannot appear.\n"
-              "           Start the server from Terminal.app (not from an IDE/agent shell).")
     if not a.no_open:
         webbrowser.open(url)
     try:
