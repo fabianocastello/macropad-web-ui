@@ -126,6 +126,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:8
     <div class="muted" style="margin:2px 0 6px" data-i="posHelp"></div>
     <div class="opick" id="opick"></div>
     <div class="tabs" id="tabs"></div>
+    <input type="file" id="impFile" accept=".yaml,.yml,text/yaml,text/plain" hidden>
     <div id="board"></div>
     <div class="legend"><span><i style="background:var(--kbd)"></i><span data-i="lgKbd">keyboard</span></span><span><i style="background:var(--mouse)"></i><span data-i="lgMouse">mouse</span></span><span><i style="background:var(--media)"></i><span data-i="lgMedia">media</span></span><span>⌃ ctrl · ⌥ opt/alt · ⇧ shift · ⌘ cmd/win</span></div>
     <p class="muted" style="margin-bottom:0" data-i="boardHelp"></p>
@@ -187,6 +188,10 @@ en: {
   quitConfirm:"Quit MacroPad UI? (open it again from its icon)", quitDone:"Server stopped. You can close this tab. To come back, open MacroPad UI again.",
   toolMissing:"⚠ ch57x-keyboard-tool not found. Install it (see the README) or set MACROPAD_TOOL.",
   termHint:"Alternative: run this in Terminal (it asks for your password there):",
+  exportLayer:"Export this layer to a file", importLayer:"Import a layer from a file", exported:"Exported: {f}",
+  importWhich:"The file has {n} layers. Which one to import (1-{n})?", importConfirm:"Replace layer {n} with the imported layer?{extra}",
+  importMismatch:"\n\nNote: the file's layout ({fr}×{fc}, {fk} knobs) differs from yours ({r}×{c}, {k} knobs). Extra keys are dropped and missing ones stay empty.",
+  importOk:"Layer {n} replaced by the imported layer.", importBad:"Could not read that file as a keyboard config.",
   "ok.uploaded":"Uploaded to the keyboard.", "ok.led":"LED mode {i} set.",
   "err.bad_name":"Invalid name (use letters, numbers, space, . _ -)", "err.not_found":"Config not found", "err.bad_yaml":"Unreadable YAML file",
 },
@@ -226,6 +231,10 @@ pt: {
   quitConfirm:"Encerrar o MacroPad UI? (abra de novo pelo ícone)", quitDone:"Servidor encerrado. Pode fechar esta aba. Para voltar, abra o MacroPad UI de novo.",
   toolMissing:"⚠ ch57x-keyboard-tool não encontrado. Instale-o (veja o README) ou defina MACROPAD_TOOL.",
   termHint:"Alternativa: rode isto no Terminal (a senha é pedida lá):",
+  exportLayer:"Exportar esta camada para um arquivo", importLayer:"Importar uma camada de um arquivo", exported:"Exportado: {f}",
+  importWhich:"O arquivo tem {n} camadas. Qual importar (1-{n})?", importConfirm:"Substituir a camada {n} pela camada importada?{extra}",
+  importMismatch:"\n\nAtenção: o layout do arquivo ({fr}×{fc}, {fk} knobs) difere do seu ({r}×{c}, {k} knobs). Teclas a mais são descartadas e as que faltam ficam vazias.",
+  importOk:"Camada {n} substituída pela camada importada.", importBad:"Não foi possível ler esse arquivo como configuração de teclado.",
   "ok.uploaded":"Enviado ao teclado.", "ok.led":"LED no modo {i}.",
   "err.bad_name":"Nome inválido (use letras, números, espaço, . _ -)", "err.not_found":"Configuração não encontrada", "err.bad_yaml":"Arquivo YAML ilegível",
 }};
@@ -292,6 +301,9 @@ function renderTabs(){
     a.onclick=()=>{cfg.layers.push(JSON.parse(JSON.stringify(cfg.layers[layer])));layer=cfg.layers.length-1;changed();renderAll()}; tb.appendChild(a); }
   if(cfg.layers.length>1){ const d=document.createElement("button"); d.textContent="🗑"; d.title=t("layerDel");
     d.onclick=()=>{ if(!confirm(t("layerDelConfirm",{n:layer+1})))return; cfg.layers.splice(layer,1);layer=0;changed();renderAll()}; tb.appendChild(d); }
+  const sp=document.createElement("span"); sp.style.flex="1"; tb.appendChild(sp);
+  const ex=document.createElement("button"); ex.textContent="⤓"; ex.title=t("exportLayer"); ex.onclick=exportLayer; tb.appendChild(ex);
+  const im=document.createElement("button"); im.textContent="⤒"; im.title=t("importLayer"); im.onclick=()=>$("#impFile").click(); tb.appendChild(im);
 }
 const MOD_SYM={ctrl:"⌃",opt:"⌥",alt:"⌥",shift:"⇧",cmd:"⌘",win:"⌘",rctrl:"r⌃",ropt:"r⌥",ralt:"r⌥",rshift:"r⇧",rcmd:"r⌘",rwin:"r⌘"};
 const KEY_SYM={enter:"⏎",escape:"esc",backspace:"⌫",tab:"⇥",space:"␣",left:"←",right:"→",up:"↑",down:"↓",delete:"⌦",home:"Home",end:"End",
@@ -388,21 +400,51 @@ function renderPicker(){
     b.title=t("o."+o); b.onclick=()=>convertOrientation(o); el.appendChild(b);
   });
 }
-function convertOrientation(nO){
-  const old=cfg.orientation; if(old===nO) return;
-  const R=cfg.rows,C=cfg.columns,n=cfg.knobs, nd=(nO==="normal"||nO==="upsidedown")?[R,C]:[C,R];
-  cfg.layers.forEach(l=>{
+function convertCfgObj(c,nO){
+  const old=c.orientation; if(old===nO) return;
+  const R=c.rows,C=c.columns,n=c.knobs, nd=(nO==="normal"||nO==="upsidedown")?[R,C]:[C,R];
+  c.layers.forEach(l=>{
     const nb=Array.from({length:nd[0]},()=>Array(nd[1]).fill(""));
     for(let pr=0;pr<R;pr++)for(let pc=0;pc<C;pc++){
       const[ur,uc]=mapBtn(old,pr,pc,R,C),[vr,vc]=mapBtn(nO,pr,pc,R,C);
       nb[vr][vc]=(l.buttons[ur]||[])[uc]||"";
     }
     const nk=Array.from({length:n},()=>({ccw:"",press:"",cw:""}));
-    for(let k=0;k<n;k++){ const oi=knobRev(old)?n-1-k:k, ni=knobRev(nO)?n-1-k:k; nk[ni]=l.knobs[oi]||nk[ni]; }
+    for(let k=0;k<n;k++){ const oi=knobRev(old)?n-1-k:k, ni=knobRev(nO)?n-1-k:k; nk[ni]=Object.assign({ccw:"",press:"",cw:""}, l.knobs[oi]||{}); }
     l.buttons=nb; l.knobs=nk;
   });
-  cfg.orientation=nO; sel=null; changed(); renderAll();
+  c.orientation=nO;
+}
+function convertOrientation(nO){
+  if(cfg.orientation===nO) return;
+  convertCfgObj(cfg,nO); sel=null; changed(); renderAll();
   log(t("orientLog",{o:nO}));
+}
+// ---------- export / import a single layer (the exported file is itself a valid 1-layer config)
+async function exportLayer(){
+  const one={orientation:cfg.orientation,rows:cfg.rows,columns:cfg.columns,knobs:cfg.knobs,layers:[JSON.parse(JSON.stringify(cfg.layers[layer]))]};
+  const r=await api("/api/yaml",{config:one});
+  const name=`${cfgName||"config"}-layer${layer+1}.yaml`;
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([r.yaml],{type:"text/yaml"})); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  log(t("exported",{f:name}));
+}
+function fitLayer(l,R,C,n){   // crop / pad a layer to R x C keys and n knobs
+  return {buttons:Array.from({length:R},(_,r)=>Array.from({length:C},(_,c)=>(l.buttons[r]||[])[c]||"")),
+          knobs:Array.from({length:n},(_,k)=>Object.assign({ccw:"",press:"",cw:""}, l.knobs[k]||{}))};
+}
+async function importLayerFile(file){
+  const text=await file.text(); const imp=await api("/api/parse",{text});
+  if(imp.error||!imp.layers||!imp.layers.length){ alert(t("importBad")); return; }
+  let idx=0;
+  if(imp.layers.length>1){ const v=parseInt(prompt(t("importWhich",{n:imp.layers.length}),"1"),10); if(!(v>=1&&v<=imp.layers.length)) return; idx=v-1; }
+  const fr=imp.rows, fc=imp.columns, fk=imp.knobs;
+  convertCfgObj(imp,cfg.orientation);                         // same physical key -> same position
+  const [R,C]=dims();
+  const mismatch=(fr!==cfg.rows||fc!==cfg.columns||fk!==cfg.knobs)?t("importMismatch",{fr,fc,fk,r:cfg.rows,c:cfg.columns,k:cfg.knobs}):"";
+  if(!confirm(t("importConfirm",{n:layer+1,extra:mismatch}))) return;
+  cfg.layers[layer]=fitLayer(imp.layers[idx],R,C,cfg.knobs);
+  sel=null; changed(); renderAll(); log(t("importOk",{n:layer+1}));
 }
 function place(el,x,y,w,h){ el.style.left=(x-w/2)+"px"; el.style.top=(y-h/2)+"px"; el.style.width=w+"px"; el.style.height=h+"px"; }
 function renderBoard(){
@@ -644,6 +686,7 @@ function bindTop(){
   const upd=()=>{cfg.rows=+$("#rows").value||1;cfg.columns=+$("#cols").value||1;cfg.knobs=+$("#knobsN").value||0;sel=null;normalize();changed();renderAll()};
   ["#rows","#cols","#knobsN"].forEach(s=>$(s).onchange=upd);
   $("#langSel").onchange=e=>setLang(e.target.value);
+  $("#impFile").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) importLayerFile(f); };
   $("#cfgSel").onchange=async e=>{ if(snapshot()!==saved && !confirm(t("discard"))){e.target.value=cfgName;return;} loadConfig(e.target.value); };
   $("#btnSave").onclick=()=>{ const n=cfgName||prompt(t("namePrompt")); if(n) save(n.trim()); };
   $("#btnSaveAs").onclick=()=>{const n=prompt(t("saveAsPrompt"),(cfgName||t("newName"))+t("copySuffix")); if(n) save(n.trim());};

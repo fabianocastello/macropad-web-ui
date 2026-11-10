@@ -5,7 +5,7 @@ It wraps the command-line tool `ch57x-keyboard-tool`
 (https://github.com/kriomant/ch57x-keyboard-tool), which does the actual USB work.
 
 Usage:
-    python3 server.py [--port 8765] [--no-open] [--tool PATH] [--configs DIR]
+    python3 server.py [--port 8777] [--no-open] [--tool PATH] [--configs DIR]
 
 The server only listens on 127.0.0.1.
 """
@@ -38,7 +38,7 @@ NAME_RE = re.compile(r"^[A-Za-z0-9._ -]{1,60}$")
 PERM_RE = re.compile(r"denied|permission|privilege|access", re.I)
 
 # Filled in by main()
-PORT = 8765
+PORT = 8777
 TOOL = None            # Path | None
 CONFIGS = None         # Path
 DATA = None            # Path
@@ -108,7 +108,12 @@ def render_yaml(cfg):
 
 
 def load_cfg(path):
-    raw = yaml.safe_load(path.read_text())
+    return cfg_from_raw(yaml.safe_load(path.read_text()))
+
+
+def cfg_from_raw(raw):
+    if not isinstance(raw, dict) or not isinstance(raw.get("layers"), list):
+        raise ValueError("not a keyboard config (missing 'layers')")
     layers = []
     for layer in raw.get("layers", []):
         layers.append({
@@ -251,6 +256,14 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=self.server.shutdown, daemon=True).start()
             return
         try:
+            if path == "/api/parse":     # read a YAML text (e.g. an exported layer) without saving it
+                text = data["text"]
+                if len(text) > 500_000:
+                    return self._err("bad_yaml", "File too large")
+                try:
+                    return self._send(cfg_from_raw(yaml.safe_load(text)))
+                except Exception as e:
+                    return self._err("bad_yaml", f"Unreadable YAML: {e}")
             if path == "/api/yaml":
                 return self._send({"yaml": render_yaml(data["config"])})
             if path == "/api/save":
@@ -285,7 +298,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     global PORT, TOOL, CONFIGS, DATA
     ap = argparse.ArgumentParser(description="MacroPad UI")
-    ap.add_argument("--port", type=int, default=int(os.environ.get("MACROPAD_PORT", 8765)))
+    ap.add_argument("--port", type=int, default=int(os.environ.get("MACROPAD_PORT", 8777)))
     ap.add_argument("--no-open", action="store_true", help="do not open the browser")
     ap.add_argument("--tool", help="path to ch57x-keyboard-tool")
     ap.add_argument("--configs", help="folder for your YAML configs")

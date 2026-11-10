@@ -5,12 +5,12 @@
 #   scripts/make_app.sh [--install] [--port N] [--out DIR]
 #
 #   --install   also copy the app to /Applications
-#   --port N    port the app uses (default 8765)
+#   --port N    port the app uses (default 8777)
 #   --out DIR   output folder (default ./build)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PORT=8765; INSTALL=0; OUT="$ROOT/build"
+PORT=8777; INSTALL=0; OUT="$ROOT/build"
 while [ $# -gt 0 ]; do
   case "$1" in
     --install) INSTALL=1 ;;

@@ -14,6 +14,7 @@ It draws your keyboard, lets you click a key or knob and set what it does, and u
 - **"Type text"**: turn a string like `Hello, world!` into the key sequence a key will type
 - **Capture**: press a combination on your computer's keyboard to fill it in
 - Live validation, generated-YAML preview, save/load of your own configs
+- **Export / import a layer** to a file (⤓ / ⤒ beside the layer tabs) — share a layer, or move it between configs and orientations
 - One-click upload (asks for your admin password once per upload on macOS)
 - UI in **English** and **Português** (auto-detected, switch any time)
 - Optional double-click **macOS app** with a Dock icon
@@ -30,7 +31,7 @@ It draws your keyboard, lets you click a key or knob and set what it does, and u
 
 ```sh
 pip3 install -r requirements.txt
-python3 macropad_ui/server.py          # opens http://127.0.0.1:8765
+python3 macropad_ui/server.py          # opens http://127.0.0.1:8777
 ```
 
 Options: `--port N`, `--no-open`, `--tool PATH`, `--configs DIR`.
@@ -67,6 +68,8 @@ Good to know:
 | `Access denied (insufficient permissions)` | The tool needs admin rights. Use the password dialog, or run the `sudo` command shown in the log. |
 | `The administrator user name or password was incorrect (-60007)` | Wrong password in the macOS dialog (Touch ID isn't accepted there), or the server wasn't started from a GUI session (start it from Terminal or the `.app`, not as a background service). |
 | `keyboard not found` | Cable not connected, or a model with other USB IDs (see the tool's README). |
+
+See [ROADMAP.md](ROADMAP.md) for what's planned.
 
 ## Credits & license
 
