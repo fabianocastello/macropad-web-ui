@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MacroPad UI</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#fff; --ink:#1c2230; --muted:#6b7385; --line:#dde1e9;
+  --accent:#3b6cf6; --accent-ink:#fff; --key:#fff; --key-sel:#e7eeff; --ok:#1a9d55; --bad:#d23b3b; --warn:#c98a00;
+  --mouse:#8a4fd6; --media:#d6694f; --kbd:#3b6cf6;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#14171e; --panel:#1d222c; --ink:#e7eaf1; --muted:#8c94a8; --line:#2d3442;
+  --accent:#6f95ff; --accent-ink:#0d1220; --key:#252b38; --key-sel:#2c3b66; --ok:#46c27d; --bad:#ff6b6b; --warn:#e6b422;
+  --mouse:#b78af0; --media:#f08e6f; --kbd:#6f95ff;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+h1{font-size:16px;margin:0 8px 0 0}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+select,input[type=text],input[type=number]{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.pill{padding:3px 10px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
+.pill.ok{color:var(--ok);border-color:var(--ok)} .pill.bad{color:var(--bad);border-color:var(--bad)} .pill.warn{color:var(--warn);border-color:var(--warn)}
+.sp{flex:1}
+main{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,1fr);gap:16px;padding:16px;max-width:1500px;margin:0 auto}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tab{border-radius:8px 8px 0 0}
+.tab.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+.led{width:8px;height:8px;border-radius:50%;background:#2c3a30;box-shadow:inset 0 1px 1px #0008}
+.led.on{background:#3dff8a;box-shadow:0 0 8px 2px #3dff8a99}
+.key{position:relative;min-width:78px;height:76px;border-radius:12px;cursor:pointer;user-select:none;
+  background:linear-gradient(180deg,#3a3e48,#272a32);border:1px solid #0e1014;
+  box-shadow:0 5px 0 #0c0d10,0 8px 10px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.22);
+  display:flex;align-items:center;justify-content:center;padding:6px 6px 8px;text-align:center;color:#eef1f8;transition:transform .06s,box-shadow .06s}
+.key:hover{filter:brightness(1.15)}
+.key:active{transform:translateY(3px);box-shadow:0 2px 0 #0c0d10,0 3px 6px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.22)}
+.key .pos{position:absolute;left:7px;top:4px;font-size:9px;color:#7b8396}
+.key .bar{position:absolute;left:14px;right:14px;top:3px;height:3px;border-radius:3px;background:transparent}
+.key.t-kbd .bar{background:var(--kbd)} .key.t-mouse .bar{background:var(--mouse)} .key.t-media .bar{background:var(--media)}
+.key .v{font-size:19px;font-weight:600;line-height:1.15;word-break:normal;overflow-wrap:anywhere;letter-spacing:.01em}
+.key .v.sm{font-size:14px}.key .v.xs{font-size:11px}
+.key .v small{display:block;font-size:10px;font-weight:400;color:#9aa3b8}
+.key .seq{display:block;font-size:12px;color:#c3cadb;margin-top:2px}
+.key.empty .v{color:#576074;font-weight:400}
+.key.sel{outline:3px solid var(--accent);outline-offset:3px}
+.dial{position:relative;width:84px;height:84px;border-radius:50%;
+  background:conic-gradient(from 20deg,#555b68,#2a2d35,#6a7080,#2a2d35,#555b68,#2a2d35,#6a7080,#2a2d35,#555b68);
+  box-shadow:0 7px 12px rgba(0,0,0,.6),inset 0 0 0 3px #0e1014,inset 0 0 0 5px #4a4f5b;display:flex;align-items:center;justify-content:center}
+.dial .cap .v{font-size:13px}.dial .cap{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#4a4f5b,#1d2027);
+  border:1px solid #0e1014;box-shadow:inset 0 1px 0 rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:#eef1f8;font-size:14px;font-weight:600;text-align:center;position:relative;line-height:1.1;padding:3px}
+.dial .cap::before{content:"";position:absolute;top:3px;width:3px;height:9px;border-radius:2px;background:#9aa3b8}
+.dial .cap.sel{outline:3px solid var(--accent);outline-offset:2px}
+.dial .cap .nm{position:absolute;bottom:-17px;font-size:9px;color:#8b93a6;font-weight:400}
+.rot{width:54px;height:36px;border-radius:10px;cursor:pointer;background:linear-gradient(180deg,#31353f,#20232a);border:1px solid #0e1014;
+  box-shadow:0 3px 0 #0c0d10,inset 0 1px 0 rgba(255,255,255,.15);color:#eef1f8;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;text-align:center;line-height:1.1;position:relative;padding:2px}
+.rot .arr{position:absolute;top:2px;font-size:10px;color:#8b93a6}
+.rot .tx{margin-top:6px}.rot .arr{left:4px;top:1px}
+.rot.empty{color:#576074;font-weight:400}
+.rot.sel{outline:3px solid var(--accent);outline-offset:2px}
+.rot.t-kbd{border-bottom:2px solid var(--kbd)}.rot.t-mouse{border-bottom:2px solid var(--mouse)}.rot.t-media{border-bottom:2px solid var(--media)}
+.stage{position:relative;transform-origin:0 0}
+.stage svg{position:absolute;left:0;top:0;overflow:visible}
+.stage .key,.stage .rot,.stage .dial,.stage .led{position:absolute}
+.stage .key{min-width:0}
+.stage .led{width:9px;height:9px;margin:-4.5px 0 0 -4.5px}
+.opick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.opick button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px;font-size:11px;max-width:112px;text-align:center;line-height:1.2}
+.opick button.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);background:var(--key-sel)}
+.opick svg{width:78px;height:62px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:4px;border-radius:3px;vertical-align:middle;margin-right:5px}
+.pv{font-size:15px;font-weight:600;margin:6px 0 0;min-height:22px}
+.ed-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chk{display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:4px 8px;cursor:pointer;user-select:none}
+.chk.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:ui-monospace,Menlo,monospace;background:var(--key-sel);border-radius:6px;padding:3px 4px 3px 8px;font-size:12px}
+.chip button{border:none;background:none;padding:0 4px;color:var(--muted)}
+.muted{color:var(--muted);font-size:12px}
+.full{grid-column:1/-1}
+pre{margin:0;max-height:260px;overflow:auto;font:12px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap}
+#log{max-height:140px}
+.cap{background:var(--warn);color:#000;border-color:var(--warn)}
+.opts button{font-size:12px;padding:4px 8px}
+details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>⌨️ MacroPad UI</h1>
+  <select id="cfgSel" data-i-title="cfgTitle"></select>
+  <button id="btnNew" data-i="new">New</button>
+  <button id="btnSave" data-i="save">Save</button>
+  <button id="btnSaveAs" data-i="saveAs">Save as…</button>
+  <span id="dirty" class="muted"></span>
+  <span class="sp"></span>
+  <span id="devPill" class="pill">…</span>
+  <span id="valPill" class="pill">—</span>
+  <select id="ledSel" data-i-title="ledTitle"><option value="" data-i="led">LED…</option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+  <select id="langSel" data-i-title="language"><option value="en">English</option><option value="pt">Português</option></select>
+  <button id="btnQuit" data-i-title="quitTitle">⏻</button>
+  <button id="btnUpload" class="primary" data-i="upload">⬆ Upload to keyboard</button>
+</header>
+
+<main>
+  <section class="card">
+    <h2 data-i="secKeyboard">Keyboard</h2>
+    <div class="row" style="margin-bottom:10px">
+      <label data-i-title="rowsTitle"><span data-i="rows">Rows</span> <input id="rows" type="number" min="1" max="6" style="width:60px"></label>
+      <label><span data-i="cols">Columns</span> <input id="cols" type="number" min="1" max="6" style="width:60px"></label>
+      <label><span data-i="knobs">Knobs</span> <input id="knobsN" type="number" min="0" max="4" style="width:60px"></label>
+    </div>
+    <div class="muted" style="margin:2px 0 6px" data-i="posHelp"></div>
+    <div class="opick" id="opick"></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="board"></div>
+    <div class="legend"><span><i style="background:var(--kbd)"></i><span data-i="lgKbd">keyboard</span></span><span><i style="background:var(--mouse)"></i><span data-i="lgMouse">mouse</span></span><span><i style="background:var(--media)"></i><span data-i="lgMedia">media</span></span><span>⌃ ctrl · ⌥ opt/alt · ⇧ shift · ⌘ cmd/win</span></div>
+    <p class="muted" style="margin-bottom:0" data-i="boardHelp"></p>
+  </section>
+
+  <section class="card">
+    <h2 id="edTitle">Editor</h2>
+    <div id="editor"></div>
+  </section>
+
+  <section class="card full">
+    <details>
+      <summary data-i="yamlGen">Generated YAML</summary>
+      <pre id="yamlOut"></pre>
+    </details>
+    <h2 data-i="logTitle">Log</h2>
+    <pre id="log"></pre>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+
+// ---------- i18n (English / Português)
+const I18N = {
+en: {
+  app:"MacroPad UI", cfgTitle:"Configuration", new:"New", save:"Save", saveAs:"Save as…", unsaved:"● unsaved",
+  led:"LED…", ledTitle:"LED mode", language:"Language", quitTitle:"Quit the local server",
+  upload:"⬆ Upload to keyboard", uploading:"Uploading…",
+  secKeyboard:"Keyboard", rows:"Rows", rowsTitle:"Counted in the default position (keys on the left)", cols:"Columns", knobs:"Knobs",
+  posHelp:"Keyboard position on your desk (each key keeps its function when you rotate):",
+  lgKbd:"keyboard", lgMouse:"mouse", lgMedia:"media",
+  boardHelp:'Click a key or a knob to edit it. The grid follows the YAML (rows × columns in the "normal" orientation).',
+  editor:"Editor", pickKey:"Select a key.", yamlGen:"Generated YAML", logTitle:"Log",
+  layerN:"Layer {n}", layerAdd:"New layer (copy of the current one)", layerDel:"Delete current layer", layerDelConfirm:"Delete layer {n}?",
+  "m.click":"🖱 click", "m.rclick":"🖱 right", "m.mclick":"🖱 middle", "m.up":"⇡ wheel", "m.down":"⇣ wheel",
+  empty:"(empty)",
+  "o.normal":"Default: keys on the left", "o.clockwise":"Keys on top", "o.counterclockwise":"Keys on bottom", "o.upsidedown":"Flipped: keys on the right",
+  orientLog:"Orientation: {o}. Every physical key kept its function (the YAML rows were rearranged).",
+  gLetters:"Letters", gNumbers:"Numbers", gF:"F1–F24", gNumpad:"Numpad", gOther:"Other",
+  keyN:"Key {n}", knobN:"Knob {n}", "a.ccw":"turn ←", "a.press":"press", "a.cw":"turn →", inLayer:"(layer {n})",
+  rawPh:"e.g. ctrl-c,ctrl-v  ·  click  ·  play  ·  <80>", clear:"Clear",
+  seqWarn:"⚠ Maximum of {n} keys per sequence on this model.",
+  txtTitle:"Type text", txtPh:"e.g. clear   ·   hello@example.com", txtEnter:"⏎ Enter at the end", txtEnterTitle:"Presses Enter after the text",
+  txtUse:"Use this text", txtAppend:"Append to sequence", txtCount:"{n}/{max} keys",
+  txtBad:" — no equivalent for: {c} (accented characters and ç are not supported yet)", txtLong:" — text too long for this keyboard",
+  chordTitle:"Build a chord", keyPh:"key…", hidPh:"HID #", hidTitle:"Decimal HID code, becomes <n>",
+  capture:"🎹 Capture from keyboard", capturing:"⏺ Press the combination…", addChord:"+ Add to sequence", setChord:"Replace",
+  chordIs:"Chord: {c}", chordHelp:"Pick modifiers and/or a key.",
+  mouseTitle:"Mouse", wheelWith:"{m}+ wheel", mediaTitle:"Media",
+  noEquiv:"No equivalent key for {c}. Use the HID field.",
+  valid:"✓ valid", invalid:"✗ invalid", valLog:"Validation: {m}",
+  devFound:"● keyboard {id}", devNone:"○ keyboard not found",
+  loadWarn:'⚠ This file uses orientation: {o}. The tool reads the key rows and the knob list already rotated/flipped. If it was written for the normal position, switch back to "Default" in the picker (otherwise the keyboard responds mirrored).',
+  saved:"Saved: {n}.yaml", discard:"Discard unsaved changes?", namePrompt:"File name:", saveAsPrompt:"Save as (without .yaml):", copySuffix:"-copy", newName:"new",
+  invalidAlert:"Invalid configuration — see the log.",
+  orientWarn:'\n\n⚠ Orientation: {o}. Keys and knobs will be written rotated/flipped relative to the "normal" YAML.',
+  uploadConfirm:"Upload this configuration to the keyboard now?\n(macOS may ask for your password.)", uploadingLog:"Uploading to the keyboard…",
+  quitConfirm:"Quit MacroPad UI? (open it again from its icon)", quitDone:"Server stopped. You can close this tab. To come back, open MacroPad UI again.",
+  toolMissing:"⚠ ch57x-keyboard-tool not found. Install it (see the README) or set MACROPAD_TOOL.",
+  termHint:"Alternative: run this in Terminal (it asks for your password there):",
+  "ok.uploaded":"Uploaded to the keyboard.", "ok.led":"LED mode {i} set.",
+  "err.bad_name":"Invalid name (use letters, numbers, space, . _ -)", "err.not_found":"Config not found", "err.bad_yaml":"Unreadable YAML file",
+},
+pt: {
+  app:"MacroPad UI", cfgTitle:"Configuração", new:"Novo", save:"Salvar", saveAs:"Salvar como…", unsaved:"● não salvo",
+  led:"LED…", ledTitle:"Modo do LED", language:"Idioma", quitTitle:"Encerra o servidor local",
+  upload:"⬆ Enviar ao teclado", uploading:"Enviando…",
+  secKeyboard:"Teclado", rows:"Linhas", rowsTitle:"Contadas na posição padrão (botões à esquerda)", cols:"Colunas", knobs:"Knobs",
+  posHelp:"Posição do teclado na sua mesa (cada tecla mantém sua função ao girar):",
+  lgKbd:"teclado", lgMouse:"mouse", lgMedia:"mídia",
+  boardHelp:'Clique numa tecla ou num knob para editar. A grade segue o YAML (linhas × colunas na orientação "normal").',
+  editor:"Editor", pickKey:"Selecione uma tecla.", yamlGen:"YAML gerado", logTitle:"Registro",
+  layerN:"Camada {n}", layerAdd:"Nova camada (cópia da atual)", layerDel:"Remover camada atual", layerDelConfirm:"Remover a camada {n}?",
+  "m.click":"🖱 clique", "m.rclick":"🖱 dir.", "m.mclick":"🖱 meio", "m.up":"⇡ roda", "m.down":"⇣ roda",
+  empty:"(vazio)",
+  "o.normal":"Padrão: botões à esquerda", "o.clockwise":"Botões em cima", "o.counterclockwise":"Botões embaixo", "o.upsidedown":"Invertido: botões à direita",
+  orientLog:"Orientação: {o}. Cada tecla física manteve sua função (as linhas do YAML foram reorganizadas).",
+  gLetters:"Letras", gNumbers:"Números", gF:"F1–F24", gNumpad:"Numpad", gOther:"Outras",
+  keyN:"Tecla {n}", knobN:"Knob {n}", "a.ccw":"girar ←", "a.press":"pressionar", "a.cw":"girar →", inLayer:"(camada {n})",
+  rawPh:"ex.: ctrl-c,ctrl-v  ·  click  ·  play  ·  <80>", clear:"Limpar",
+  seqWarn:"⚠ Máximo de {n} teclas por sequência neste modelo.",
+  txtTitle:"Escrever texto", txtPh:"ex.: clear   ·   oi@exemplo.com", txtEnter:"⏎ Enter no fim", txtEnterTitle:"Aperta Enter depois do texto",
+  txtUse:"Usar este texto", txtAppend:"Acrescentar à sequência", txtCount:"{n}/{max} teclas",
+  txtBad:" — sem equivalente: {c} (acentos e ç ainda não são suportados)", txtLong:" — texto longo demais para este teclado",
+  chordTitle:"Montar acorde", keyPh:"tecla…", hidPh:"HID nº", hidTitle:"Código HID decimal, vira <n>",
+  capture:"🎹 Capturar do teclado", capturing:"⏺ Pressione a combinação…", addChord:"+ Adicionar à sequência", setChord:"Substituir",
+  chordIs:"Acorde: {c}", chordHelp:"Escolha modificadores e/ou uma tecla.",
+  mouseTitle:"Mouse", wheelWith:"{m}+ roda", mediaTitle:"Mídia",
+  noEquiv:"Tecla sem equivalente para {c}. Use o campo HID.",
+  valid:"✓ válido", invalid:"✗ inválido", valLog:"Validação: {m}",
+  devFound:"● teclado {id}", devNone:"○ teclado não encontrado",
+  loadWarn:'⚠ Este arquivo usa orientation: {o}. A ferramenta lê as linhas de teclas e a lista de knobs já rotacionadas/invertidas. Se ele foi escrito para a posição normal, volte para "Padrão" no seletor (ou o teclado reagirá espelhado).',
+  saved:"Salvo: {n}.yaml", discard:"Descartar alterações não salvas?", namePrompt:"Nome do arquivo:", saveAsPrompt:"Salvar como (sem .yaml):", copySuffix:"-copia", newName:"novo",
+  invalidAlert:"Configuração inválida — veja o registro.",
+  orientWarn:'\n\n⚠ Orientação: {o}. Teclas e knobs serão gravados rotacionados/invertidos em relação ao YAML "normal".',
+  uploadConfirm:"Enviar esta configuração ao teclado agora?\n(O macOS pode pedir a sua senha.)", uploadingLog:"Enviando ao teclado…",
+  quitConfirm:"Encerrar o MacroPad UI? (abra de novo pelo ícone)", quitDone:"Servidor encerrado. Pode fechar esta aba. Para voltar, abra o MacroPad UI de novo.",
+  toolMissing:"⚠ ch57x-keyboard-tool não encontrado. Instale-o (veja o README) ou defina MACROPAD_TOOL.",
+  termHint:"Alternativa: rode isto no Terminal (a senha é pedida lá):",
+  "ok.uploaded":"Enviado ao teclado.", "ok.led":"LED no modo {i}.",
+  "err.bad_name":"Nome inválido (use letras, números, espaço, . _ -)", "err.not_found":"Configuração não encontrada", "err.bad_yaml":"Arquivo YAML ilegível",
+}};
+let LANG = (() => { const q = new URLSearchParams(location.search).get("lang"); if (q === "en" || q === "pt") return q;
+  try { const s = localStorage.getItem("lang"); if (s === "en" || s === "pt") return s; } catch (e) {}
+  return (navigator.language || "en").toLowerCase().startsWith("pt") ? "pt" : "en"; })();
+const t = (k, v = {}) => String((I18N[LANG] && I18N[LANG][k]) ?? I18N.en[k] ?? k).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? "");
+function applyStatic(){
+  document.documentElement.lang = LANG; document.title = t("app");
+  document.querySelectorAll("[data-i]").forEach(e => e.textContent = t(e.dataset.i));
+  document.querySelectorAll("[data-i-title]").forEach(e => e.title = t(e.dataset.iTitle));
+  $("#langSel").value = LANG;
+}
+function setLang(l){
+  LANG = l; try { localStorage.setItem("lang", l); } catch (e) {}
+  applyStatic(); if (cfg) renderAll(); refreshDevice(); if (cfg) validate(); updateDirty();
+}
+const apiMsg = r => (r.code && I18N[LANG]["ok." + r.code] !== undefined) ? t("ok." + r.code, {i: r.index}) : (I18N[LANG]["err." + r.code] ? t("err." + r.code) : (r.message || r.error || ""));
+
+// ---------- state
+const MODS = [["ctrl","ctrl"],["opt","opt / alt"],["shift","shift"],["cmd","cmd / win"],
+              ["rctrl","r-ctrl"],["ropt","r-opt"],["rshift","r-shift"],["rcmd","r-cmd"]];
+const MOUSE = ["click","rclick","mclick","wheelup","wheeldown","click+rclick"];
+let KEYS = {}, MEDIA = [], cfg = null, cfgName = null, saved = "", sel = null, layer = 0;
+let SEQ_MAX = 18, txtEnter = false, capturing = false, capMods = new Set(), capKey = null, validateTimer = null;
+let draft = {mods:new Set(), key:""};
+
+async function api(path, body){
+  const r = await fetch(path, body ? {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)} : {});
+  return r.json();
+}
+function log(msg){ const el=$("#log"); el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent; }
+
+// ---------- config model
+const isHoriz = () => ["normal","upsidedown"].includes(cfg.orientation);
+const dims = () => isHoriz() ? [cfg.rows,cfg.columns] : [cfg.columns,cfg.rows];
+function normalize(){
+  const [R,C] = dims();
+  cfg.layers.forEach(l=>{
+    l.buttons = Array.from({length:R},(_,r)=>Array.from({length:C},(_,c)=>(l.buttons[r]||[])[c]||""));
+    l.knobs = Array.from({length:cfg.knobs},(_,k)=>Object.assign({ccw:"",press:"",cw:""}, l.knobs[k]||{}));
+  });
+  if(layer>=cfg.layers.length) layer=cfg.layers.length-1;
+}
+function typeOf(v){
+  if(!v) return "";
+  if(/click|wheel/.test(v)) return "mouse";
+  if(MEDIA.includes(v)) return "media";
+  return "kbd";
+}
+function getVal(s){ const l = cfg.layers[layer]; return s.kind==="btn" ? l.buttons[s.r][s.c] : l.knobs[s.k][s.a]; }
+function setVal(s,v){ const l = cfg.layers[layer]; if(s.kind==="btn") l.buttons[s.r][s.c]=v; else l.knobs[s.k][s.a]=v; changed(); }
+
+// ---------- rendering
+function renderAll(){ normalize(); renderTop(); renderTabs(); renderBoard(); renderEditor(); updateYaml(); }
+function renderTop(){ $("#rows").value=cfg.rows; $("#cols").value=cfg.columns; $("#knobsN").value=cfg.knobs; }
+function renderTabs(){
+  const tb=$("#tabs"); tb.innerHTML="";
+  cfg.layers.forEach((_,i)=>{
+    const b=document.createElement("button"); b.className="tab"+(i===layer?" on":""); b.textContent=t("layerN",{n:i+1});
+    b.onclick=()=>{layer=i;renderAll()}; tb.appendChild(b);
+  });
+  if(cfg.layers.length<3){ const a=document.createElement("button"); a.textContent="+"; a.title=t("layerAdd");
+    a.onclick=()=>{cfg.layers.push(JSON.parse(JSON.stringify(cfg.layers[layer])));layer=cfg.layers.length-1;changed();renderAll()}; tb.appendChild(a); }
+  if(cfg.layers.length>1){ const d=document.createElement("button"); d.textContent="🗑"; d.title=t("layerDel");
+    d.onclick=()=>{ if(!confirm(t("layerDelConfirm",{n:layer+1})))return; cfg.layers.splice(layer,1);layer=0;changed();renderAll()}; tb.appendChild(d); }
+}
+const MOD_SYM={ctrl:"⌃",opt:"⌥",alt:"⌥",shift:"⇧",cmd:"⌘",win:"⌘",rctrl:"r⌃",ropt:"r⌥",ralt:"r⌥",rshift:"r⇧",rcmd:"r⌘",rwin:"r⌘"};
+const KEY_SYM={enter:"⏎",escape:"esc",backspace:"⌫",tab:"⇥",space:"␣",left:"←",right:"→",up:"↑",down:"↓",delete:"⌦",home:"Home",end:"End",
+  pageup:"PgUp",pagedown:"PgDn",minus:"−",equal:"=",dot:".",comma:",",slash:"/",backslash:"\\",semicolon:";",quote:"'",grave:"`",
+  leftbracket:"[",rightbracket:"]",capslock:"⇪",printscreen:"PrtSc",numpadplus:"N+",numpadminus:"N−",numpadasterisk:"N*",numpadslash:"N/",
+  numpadenter:"N⏎",numpaddot:"N.",application:"☰"};
+const HID_SYM={"80":"←","79":"→","81":"↓","82":"↑","74":"Home","77":"End","75":"PgUp","78":"PgDn","40":"⏎","41":"esc","42":"⌫","43":"⇥","44":"␣","76":"⌦"};
+const MEDIA_SYM={next:"⏭",prev:"⏮",previous:"⏮",play:"⏯",stop:"⏹",mute:"🔇",volumeup:"🔊",volumedown:"🔉",favorites:"★",calculator:"🧮",screenlock:"🔒"};
+const mouseSym = k => ({click:t("m.click"),lclick:t("m.click"),rclick:t("m.rclick"),mclick:t("m.mclick"),wheelup:t("m.up"),wheeldown:t("m.down")})[k];
+function chordPretty(c){
+  const parts=c.split("-"); let key=parts.pop(), mods=parts.map(m=>MOD_SYM[m]||m).join("");
+  if(!key) return mods;
+  if(MOD_SYM[key]&&!parts.length&&c.indexOf("-")<0) return MOD_SYM[key];
+  if(MOD_SYM[key]){ return mods+MOD_SYM[key]; }  // modifiers only, e.g. alt-shift
+  let g;
+  const hid=key.match(/^<(\d+)>$/);
+  if(hid) g=HID_SYM[hid[1]]||("#"+hid[1]);
+  else if(KEY_SYM[key]) g=KEY_SYM[key];
+  else if(/^numpad\d$/.test(key)) g="N"+key[6];
+  else g=key.toUpperCase();
+  return mods+g;
+}
+function pretty(v){
+  if(!v) return {txt:"",n:0};
+  if(MEDIA_SYM[v]) return {txt:MEDIA_SYM[v],n:1,label:v};
+  if(/click|wheel/.test(v)){
+    const s=v.split("+").map(x=>{const m=x.match(/^(?:(ctrl|shift|alt)-)?(.+)$/);return (m[1]?MOD_SYM[m[1]]:"")+(mouseSym(m[2])||m[2])}).join(" + ");
+    return {txt:s,n:s.length};
+  }
+  const ch=v.split(",").map(chordPretty);
+  return {txt:ch.join(" "),n:ch.join("").length+(ch.length>1?6:0), seq:ch.length>1?ch:null};
+}
+function fillLabel(el,val){
+  const p=pretty(val); el.title=val||t("empty");
+  if(!val){el.textContent="—";return;}
+  if(p.seq){ el.innerHTML=""; const s=document.createElement("span"); s.textContent=p.seq.join(" "); el.appendChild(s); }
+  else el.textContent=p.txt;
+  el.classList.toggle("sm",p.n>6&&p.n<=12); el.classList.toggle("xs",p.n>12);
+}
+function keyEl(val,label,isSel,onclick){
+  const d=document.createElement("div");
+  d.className="key "+(val?"t-"+typeOf(val):"empty")+(isSel?" sel":"");
+  d.innerHTML=`<span class="bar"></span><span class="pos"></span><span class="v"></span>`;
+  d.children[1].textContent=label; fillLabel(d.children[2],val);
+  d.onclick=onclick; return d;
+}
+function rotEl(val,arrow,isSel,onclick){
+  const d=document.createElement("div");
+  d.className="rot "+(val?"t-"+typeOf(val):"empty")+(isSel?" sel":"");
+  d.innerHTML=`<span class="arr"></span><span class="tx"></span>`;
+  d.children[0].textContent=arrow; fillLabel(d.children[1],val); d.onclick=onclick; return d;
+}
+const P=88, ORIENTS=["normal","clockwise","counterclockwise","upsidedown"];
+function layout(o,rows,cols,n){
+  const Bw=cols*P+38, Bh=rows*P+44;
+  const kr=40, KB=Math.round(kr*1.5), kn=[];   // the 3rd knob is drawn 50% larger (like the real 4x3 / 3-knob model)
+  for(let i=0;i<n;i++){
+    const r=(n>=3&&i===2)?KB:kr;
+    kn.push({k:i,x:Bw+104,y:i?kn[i-1].y+kn[i-1].r+10+r:66,r});
+  }
+  const W=Bw+104+(n>=3?KB:kr)+22;
+  const bodyBottom=Math.max(Bh, n?kn[n-1].y+kn[n-1].r+22:Bh);
+  const pL=24,pT=36,pR=24,pB=30, FW0=W+pL+pR, FH0=bodyBottom+pT+pB;
+  const horiz=o==="normal"||o==="upsidedown";
+  const FW=horiz?FW0:FH0, FH=horiz?FH0:FW0;
+  const T=(x,y)=>{x+=pL;y+=pT; return o==="normal"?[x,y]:o==="upsidedown"?[FW0-x,FH0-y]:o==="clockwise"?[FH0-y,x]:[y,FW0-x];};
+  const m={normal:"1 0 0 1 0 0",upsidedown:`-1 0 0 -1 ${FW0} ${FH0}`,clockwise:`0 1 -1 0 ${FH0} 0`,counterclockwise:`0 -1 1 0 0 ${FW0}`}[o];
+  const path=`M14 0H${W-18}Q${W} 0 ${W} 18V${bodyBottom-18}Q${W} ${bodyBottom} ${W-18} ${bodyBottom}H14Q0 ${bodyBottom} 0 ${bodyBottom-14}V14Q0 0 14 0Z`;
+  const keys=[]; for(let r=0;r<rows;r++)for(let c=0;c<cols;c++) keys.push({pr:r,pc:c,x:22+P*c+44,y:22+P*r+44});
+  const dir={normal:[-1,0],upsidedown:[1,0],clockwise:[0,-1],counterclockwise:[0,1]}[o];
+  const svgBody=`<g transform="matrix(${m})"><g transform="translate(${pL},${pT})">
+    <rect x="${Bw+60}" y="-12" width="44" height="14" rx="3" fill="#aeb5b2" stroke="#3a3f3d"/><rect x="${Bw+68}" y="-34" width="28" height="26" rx="5" fill="#1a1c20"/>
+    <path d="${path}" fill="url(#acr)" stroke="#2c312f" stroke-width="2"/>
+    <ellipse cx="${Bw+30}" cy="14" rx="46" ry="20" fill="#3dff8a" opacity=".13"/>
+    ${[[12,12],[12,bodyBottom-12],[W-14,12],[W-14,bodyBottom-12]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="5" fill="#cfd5d2" stroke="#3a3f3d"/>`).join("")}</g></g>`;
+  return {o,FW,FH,T,keys,kn,dir,Bw,Bh,svgBody,rows,cols,n,pL,pT};
+}
+// physical key (pr,pc) in the normal frame -> cell in the YAML grid for orientation o (mirrors ch57x-keyboard-tool)
+const mapBtn=(o,pr,pc,R,C)=>o==="normal"?[pr,pc]:o==="upsidedown"?[R-pr-1,C-pc-1]:o==="clockwise"?[pc,R-pr-1]:[C-pc-1,pr];
+const knobRev=o=>o==="upsidedown"||o==="clockwise";
+const DEFS=`<defs><linearGradient id="acr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9ba5a0"/><stop offset=".55" stop-color="#6f7773"/><stop offset="1" stop-color="#565d5a"/></linearGradient></defs>`;
+function miniSvg(o){
+  const L=layout(o,3,4,3);
+  let g=`<svg viewBox="0 0 ${L.FW} ${L.FH}">${DEFS}${L.svgBody}`;
+  L.keys.forEach(k=>{const[x,y]=L.T(k.x,k.y);g+=`<rect x="${x-34}" y="${y-34}" width="68" height="68" rx="9" fill="#14161b"/>`});
+  L.kn.forEach(k=>{const[x,y]=L.T(k.x,k.y);g+=`<circle cx="${x}" cy="${y}" r="${k.r}" fill="#14161b" stroke="#8b93a6" stroke-width="6"/>`});
+  return g+"</svg>";
+}
+function renderPicker(){
+  const el=$("#opick"); el.innerHTML="";
+  ORIENTS.forEach(o=>{
+    const b=document.createElement("button"); b.className=cfg.orientation===o?"on":"";
+    b.innerHTML=miniSvg(o)+`<span>${t("o."+o)}</span>`;
+    b.title=t("o."+o); b.onclick=()=>convertOrientation(o); el.appendChild(b);
+  });
+}
+function convertOrientation(nO){
+  const old=cfg.orientation; if(old===nO) return;
+  const R=cfg.rows,C=cfg.columns,n=cfg.knobs, nd=(nO==="normal"||nO==="upsidedown")?[R,C]:[C,R];
+  cfg.layers.forEach(l=>{
+    const nb=Array.from({length:nd[0]},()=>Array(nd[1]).fill(""));
+    for(let pr=0;pr<R;pr++)for(let pc=0;pc<C;pc++){
+      const[ur,uc]=mapBtn(old,pr,pc,R,C),[vr,vc]=mapBtn(nO,pr,pc,R,C);
+      nb[vr][vc]=(l.buttons[ur]||[])[uc]||"";
+    }
+    const nk=Array.from({length:n},()=>({ccw:"",press:"",cw:""}));
+    for(let k=0;k<n;k++){ const oi=knobRev(old)?n-1-k:k, ni=knobRev(nO)?n-1-k:k; nk[ni]=l.knobs[oi]||nk[ni]; }
+    l.buttons=nb; l.knobs=nk;
+  });
+  cfg.orientation=nO; sel=null; changed(); renderAll();
+  log(t("orientLog",{o:nO}));
+}
+function place(el,x,y,w,h){ el.style.left=(x-w/2)+"px"; el.style.top=(y-h/2)+"px"; el.style.width=w+"px"; el.style.height=h+"px"; }
+function renderBoard(){
+  renderPicker();
+  const b=$("#board"); b.innerHTML="";
+  const o=cfg.orientation, R=cfg.rows, C=cfg.columns, n=cfg.knobs, l=cfg.layers[layer];
+  const L=layout(o,R,C,n);
+  const stage=document.createElement("div"); stage.className="stage"; stage.style.width=L.FW+"px"; stage.style.height=L.FH+"px";
+  stage.innerHTML=`<svg width="${L.FW}" height="${L.FH}">${DEFS}${L.svgBody}</svg>`;
+  b.appendChild(stage);
+  L.keys.forEach(k=>{
+    const [ur,uc]=mapBtn(o,k.pr,k.pc,R,C), [x,y]=L.T(k.x,k.y);
+    const isSel=sel&&sel.kind==="btn"&&sel.r===ur&&sel.c===uc;
+    const el=keyEl(l.buttons[ur][uc],String(k.pr*C+k.pc+1),isSel,()=>{sel={kind:"btn",r:ur,c:uc};draft={mods:new Set(),key:""};renderBoard();renderEditor()});
+    place(el,x,y,78,76); stage.appendChild(el);
+  });
+  L.kn.forEach(k=>{
+    const ui=knobRev(o)?n-1-k.k:k.k, kd=l.knobs[ui], [x,y]=L.T(k.x,k.y);
+    const pick=a=>()=>{sel={kind:"knob",k:ui,a};draft={mods:new Set(),key:""};renderBoard();renderEditor()};
+    const isS=a=>sel&&sel.kind==="knob"&&sel.k===ui&&sel.a===a;
+    const d=document.createElement("div"); d.className="dial"; place(d,x,y,k.r*2,k.r*2);
+    const cs=Math.round(58*k.r/40);
+    const cap=document.createElement("div"); cap.className="cap"+(isS("press")?" sel":""); cap.style.width=cap.style.height=cs+"px";
+    const lab=document.createElement("span"); lab.className="v"; fillLabel(lab,kd.press); cap.appendChild(lab);
+    const nm=document.createElement("span"); nm.className="nm"; nm.textContent=`KNOB ${k.k+1}`; cap.appendChild(nm);
+    cap.onclick=pick("press"); d.appendChild(cap); stage.appendChild(d);
+    // rotation pills sit on the side facing the keys
+    const [dx,dy]=L.dir, off=k.r+6;
+    [["ccw","↺"],["cw","↻"]].forEach(([a,sym],i)=>{
+      const el=rotEl(kd[a],sym,isS(a),pick(a)); let px,py;
+      if(dx!==0){ px=x+dx*(off+27); py=y+(i?19:-19); } else { px=x+(i?29:-29); py=y+dy*(off+18); }
+      place(el,px,py,54,36); stage.appendChild(el);
+    });
+  });
+  cfg.layers.forEach((_,i)=>{ const [x,y]=L.T(L.Bw+16+i*18,12); const e=document.createElement("div"); e.className="led"+(i===layer?" on":""); e.style.left=x+"px"; e.style.top=y+"px"; e.title=t("layerN",{n:i+1}); stage.appendChild(e); });
+  const avail=b.clientWidth||L.FW, s=Math.min(1,avail/L.FW);
+  stage.style.transform=`scale(${s})`; b.style.height=(L.FH*s)+"px";
+}
+window.addEventListener("resize",()=>{ if(cfg) renderBoard(); });
+
+// ---------- editor
+function allKeyNames(){
+  const groups=[[t("gLetters"),/^[a-z]$/],[t("gNumbers"),/^[0-9]$/],[t("gF"),/^f\d+$/],[t("gNumpad"),/^numpad/],[t("gOther"),/.*/]];
+  const used=new Set(), out=[];
+  const names=(KEYS["Keys"]||[]).map(x=>x[0]);
+  groups.forEach(([n,re])=>{const ks=names.filter(k=>!used.has(k)&&re.test(k)); ks.forEach(k=>used.add(k)); if(ks.length)out.push([n,ks]);});
+  return out;
+}
+function physNum(){
+  const o=cfg.orientation,R=cfg.rows,C=cfg.columns;
+  for(let pr=0;pr<R;pr++)for(let pc=0;pc<C;pc++){const[ur,uc]=mapBtn(o,pr,pc,R,C); if(ur===sel.r&&uc===sel.c) return pr*C+pc+1;}
+  return "?";
+}
+function renderEditor(){
+  const ed=$("#editor");
+  if(!sel){ $("#edTitle").textContent=t("editor"); ed.innerHTML=`<p class="muted">${t("pickKey")}</p>`; return; }
+  const v=getVal(sel);
+  const label = sel.kind==="btn" ? t("keyN",{n:physNum()}) : `${t("knobN",{n:(knobRev(cfg.orientation)?cfg.knobs-1-sel.k:sel.k)+1})} — ${t("a."+sel.a)}`;
+  $("#edTitle").textContent=`${label} ${t("inLayer",{n:layer+1})}`;
+  const chords = typeOf(v)==="kbd" ? v.split(",") : [];
+  const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  ed.innerHTML=`
+    <div class="row"><input id="raw" type="text" style="flex:1;font-family:ui-monospace,Menlo,monospace" placeholder="${esc(t("rawPh"))}" value="">
+      <button id="clr">${t("clear")}</button></div>
+    <div id="pv" class="pv"></div>
+    <div id="seq" class="chips" style="margin-top:8px"></div>
+    <p id="seqWarn" class="muted" style="color:var(--warn)"></p>
+    <h2 style="margin-top:14px">${t("txtTitle")}</h2>
+    <div class="row"><input id="txt" type="text" autocomplete="off" spellcheck="false" style="flex:1" placeholder="${esc(t("txtPh"))}">
+      <span class="chk" id="txtEnter" title="${esc(t("txtEnterTitle"))}">${t("txtEnter")}</span></div>
+    <p class="muted" id="txtInfo"></p>
+    <div class="ed-row"><button id="txtSet" class="primary">${t("txtUse")}</button><button id="txtAdd">${t("txtAppend")}</button></div>
+    <h2 style="margin-top:14px">${t("chordTitle")}</h2>
+    <div class="ed-row" id="modRow"></div>
+    <div class="ed-row">
+      <select id="keySel" style="flex:1"><option value="">${t("keyPh")}</option></select>
+      <input id="custom" type="number" min="0" max="255" placeholder="${esc(t("hidPh"))}" style="width:90px" title="${esc(t("hidTitle"))}">
+    </div>
+    <div class="ed-row">
+      <button id="capBtn">${t("capture")}</button>
+      <button id="addChord" class="primary">${t("addChord")}</button>
+      <button id="setChord">${t("setChord")}</button>
+    </div>
+    <p class="muted" id="draftTxt"></p>
+    <h2 style="margin-top:14px">${t("mouseTitle")}</h2>
+    <div class="ed-row opts" id="mouseRow"></div>
+    <div class="ed-row">
+      ${["ctrl","shift","alt"].map(m=>`<label class="chk" data-mm="${m}"><span>${t("wheelWith",{m})}</span></label>`).join("")}
+    </div>
+    <h2 style="margin-top:14px">${t("mediaTitle")}</h2>
+    <div class="ed-row opts" id="mediaRow"></div>`;
+  $("#raw").value=v;
+  $("#raw").oninput=e=>{setVal(sel,e.target.value.trim());renderBoard();renderSeqOnly();};
+  $("#clr").onclick=()=>{setVal(sel,"");renderAll()};
+  renderSeq(chords); $("#pv").textContent=pretty(v).txt;
+  { const d=chordsToText(v); txtEnter=d?d.enter:false; $("#txt").value=d?d.text:""; $("#txtEnter").classList.toggle("on",txtEnter); updateTxtInfo();
+    $("#txt").oninput=updateTxtInfo;
+    $("#txtEnter").onclick=()=>{txtEnter=!txtEnter;$("#txtEnter").classList.toggle("on",txtEnter);updateTxtInfo();};
+    $("#txtSet").onclick=()=>{const r=updateTxtInfo(); if(!r.chords.length)return; setVal(sel,r.chords.join(",")); renderAll();};
+    $("#txtAdd").onclick=()=>{const r=updateTxtInfo(); if(!r.chords.length)return; const cur=getVal(sel); setVal(sel,cur?cur+","+r.chords.join(","):r.chords.join(",")); renderAll();}; }
+  const mr=$("#modRow");
+  MODS.forEach(([k,lab])=>{const s=document.createElement("span");s.className="chk"+(draft.mods.has(k)?" on":"");s.textContent=lab;
+    s.onclick=()=>{draft.mods.has(k)?draft.mods.delete(k):draft.mods.add(k);renderDraft(mr)};mr.appendChild(s);});
+  const ks=$("#keySel");
+  allKeyNames().forEach(([g,list])=>{const og=document.createElement("optgroup");og.label=g;list.forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=k;og.appendChild(o)});ks.appendChild(og)});
+  ks.value=draft.key; ks.onchange=()=>{draft.key=ks.value;$("#custom").value="";updateDraftTxt()};
+  $("#custom").oninput=e=>{if(e.target.value!==""){draft.key=`<${e.target.value}>`;ks.value="";}else draft.key="";updateDraftTxt()};
+  $("#addChord").onclick=()=>applyChord(true);
+  $("#setChord").onclick=()=>applyChord(false);
+  $("#capBtn").onclick=toggleCapture;
+  const mo=$("#mouseRow"); MOUSE.forEach(m=>{const b=document.createElement("button");b.textContent=m;b.onclick=()=>{setVal(sel,m);renderAll()};mo.appendChild(b)});
+  document.querySelectorAll("[data-mm]").forEach(el=>el.onclick=()=>{setVal(sel,el.dataset.mm+"-wheelup");renderAll()});
+  const md=$("#mediaRow"); MEDIA.forEach(m=>{const b=document.createElement("button");b.textContent=m;b.onclick=()=>{setVal(sel,m);renderAll()};md.appendChild(b)});
+  updateDraftTxt();
+}
+function renderDraft(mr){ mr.querySelectorAll(".chk").forEach((el,i)=>el.classList.toggle("on",draft.mods.has(MODS[i][0]))); updateDraftTxt(); }
+function draftChord(){
+  const parts=MODS.map(m=>m[0]).filter(k=>draft.mods.has(k)); if(draft.key) parts.push(draft.key);
+  return parts.join("-");
+}
+function updateDraftTxt(){ const c=draftChord(); const el=$("#draftTxt"); if(el) el.textContent=c?t("chordIs",{c}):t("chordHelp"); }
+function applyChord(append){
+  const c=draftChord(); if(!c) return;
+  const cur=getVal(sel);
+  setVal(sel, append && cur && typeOf(cur)==="kbd" ? cur+","+c : c);
+  draft={mods:new Set(),key:""}; renderAll();
+}
+function renderSeq(chords){
+  const el=$("#seq"); el.innerHTML="";
+  chords.forEach((c,i)=>{const s=document.createElement("span");s.className="chip";s.textContent=c;
+    const x=document.createElement("button");x.textContent="×";x.onclick=()=>{const a=getVal(sel).split(",");a.splice(i,1);setVal(sel,a.join(","));renderAll()};
+    s.appendChild(x);el.appendChild(s)});
+  $("#seqWarn").textContent = chords.length>SEQ_MAX ? t("seqWarn",{n:SEQ_MAX}) : "";
+}
+function renderSeqOnly(){ const pv=$('#pv'); if(pv) pv.textContent=pretty(getVal(sel)).txt; const v=getVal(sel); renderSeq(typeOf(v)==="kbd"?v.split(","):[]); }
+
+// ---------- text <-> key sequence (US-QWERTY key positions; also correct for the macOS "Brazilian - Pro" layout, ASCII only)
+const SYM_U={"-":"minus","=":"equal","[":"leftbracket","]":"rightbracket","\\":"backslash",";":"semicolon","'":"quote","`":"grave",",":"comma",".":"dot","/":"slash"};
+const SYM_S={"!":"1","@":"2","#":"3","$":"4","%":"5","^":"6","&":"7","*":"8","(":"9",")":"0","_":"minus","+":"equal","{":"leftbracket","}":"rightbracket","|":"backslash",":":"semicolon",'"':"quote","~":"grave","<":"comma",">":"dot","?":"slash"};
+const CH2CHORD={" ":"space","\t":"tab","\n":"enter"};
+for(const c of "abcdefghijklmnopqrstuvwxyz0123456789") CH2CHORD[c]=c;
+for(const c of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") CH2CHORD[c]="shift-"+c.toLowerCase();
+for(const [c,k] of Object.entries(SYM_U)) CH2CHORD[c]=k;
+for(const [c,k] of Object.entries(SYM_S)) CH2CHORD[c]="shift-"+k;
+const CHORD2CH=Object.fromEntries(Object.entries(CH2CHORD).map(([c,k])=>[k,c]));
+function textToChords(s,enter){
+  const out=[],bad=new Set();
+  for(const ch of s){ if(CH2CHORD[ch]) out.push(CH2CHORD[ch]); else bad.add(ch); }
+  if(enter) out.push("enter");
+  return {chords:out,bad:[...bad]};
+}
+function chordsToText(v){
+  if(!v||typeOf(v)!=="kbd") return null;
+  let a=v.split(","), enter=false;
+  if(a.length>1&&a[a.length-1]==="enter"){enter=true;a=a.slice(0,-1);}
+  let s=""; for(const c of a){ if(!CHORD2CH[c]||c==="enter") return null; s+=CHORD2CH[c]; }
+  return {text:s,enter};
+}
+function updateTxtInfo(){
+  const s=$("#txt").value, r=textToChords(s,txtEnter), n=r.chords.length;
+  let msg=t("txtCount",{n,max:SEQ_MAX}); const ok=n>0&&n<=SEQ_MAX&&!r.bad.length;
+  if(r.bad.length) msg+=t("txtBad",{c:r.bad.map(c=>JSON.stringify(c)).join(" ")});
+  else if(n>SEQ_MAX) msg+=t("txtLong");
+  $("#txtInfo").textContent=msg; $("#txtInfo").style.color=ok||!s?"":"var(--warn)";
+  $("#txtSet").disabled=!ok; $("#txtAdd").disabled=!ok||typeOf(getVal(sel))!=="kbd";
+  return r;
+}
+
+// ---------- capture keyboard
+const CODE_MAP={Enter:"enter",Escape:"escape",Backspace:"backspace",Tab:"tab",Space:"space",Minus:"minus",Equal:"equal",
+ BracketLeft:"leftbracket",BracketRight:"rightbracket",Backslash:"backslash",Semicolon:"semicolon",Quote:"quote",Backquote:"grave",
+ Comma:"comma",Period:"dot",Slash:"slash",CapsLock:"capslock",PrintScreen:"printscreen",ScrollLock:"scrolllock",Pause:"pause",
+ Insert:"insert",Home:"home",PageUp:"pageup",Delete:"delete",End:"end",PageDown:"pagedown",ArrowRight:"right",ArrowLeft:"left",
+ ArrowDown:"down",ArrowUp:"up",NumLock:"numlock",NumpadDivide:"numpadslash",NumpadMultiply:"numpadasterisk",NumpadSubtract:"numpadminus",
+ NumpadAdd:"numpadplus",NumpadEnter:"numpadenter",NumpadDecimal:"numpaddot",NumpadEqual:"numpadequal",ContextMenu:"application",IntlBackslash:"nonusbackslash"};
+const MOD_MAP={ControlLeft:"ctrl",ControlRight:"rctrl",ShiftLeft:"shift",ShiftRight:"rshift",AltLeft:"opt",AltRight:"ropt",MetaLeft:"cmd",MetaRight:"rcmd"};
+function codeToKey(c){
+  if(MOD_MAP[c]) return null;
+  if(/^Key[A-Z]$/.test(c)) return c[3].toLowerCase();
+  if(/^Digit\d$/.test(c)) return c[5];
+  if(/^F\d+$/.test(c)) return c.toLowerCase();
+  if(/^Numpad\d$/.test(c)) return "numpad"+c[6];
+  return CODE_MAP[c]||null;
+}
+function toggleCapture(){
+  capturing=!capturing; capMods=new Set(); capKey=null;
+  const b=$("#capBtn"); b.classList.toggle("cap",capturing); b.textContent=capturing?t("capturing"):t("capture");
+}
+const held=new Set();
+window.addEventListener("keydown",e=>{
+  if(!capturing) return; e.preventDefault(); e.stopPropagation();
+  held.add(e.code);
+  if(MOD_MAP[e.code]) capMods.add(MOD_MAP[e.code]); else { const k=codeToKey(e.code); if(k) capKey=k; else log(t("noEquiv",{c:e.code})); }
+  draft.mods=new Set(capMods); draft.key=capKey||""; const mr=$("#modRow"); if(mr) renderDraft(mr); const ks=$("#keySel"); if(ks) ks.value=draft.key;
+},true);
+window.addEventListener("keyup",e=>{
+  if(!capturing) return; e.preventDefault(); held.delete(e.code);
+  if(held.size===0 && (capMods.size||capKey)){ capturing=false; const b=$("#capBtn"); if(b){b.classList.remove("cap");b.textContent=t("capture");} }
+},true);
+
+// ---------- state / dirty / yaml / validate
+function snapshot(){ return JSON.stringify(cfg); }
+function updateDirty(){ $("#dirty").textContent = cfg && snapshot()!==saved ? t("unsaved") : ""; }
+function changed(){
+  updateDirty();
+  clearTimeout(validateTimer); validateTimer=setTimeout(()=>{updateYaml();validate()},400);
+}
+async function updateYaml(){ const r=await api("/api/yaml",{config:cfg}); $("#yamlOut").textContent=r.yaml||""; }
+async function validate(){
+  const r=await api("/api/validate",{config:cfg}); const p=$("#valPill");
+  p.textContent=r.ok?t("valid"):t("invalid"); p.className="pill "+(r.ok?"ok":"bad"); p.title=r.message||"";
+  if(!r.ok) log(t("valLog",{m:r.message}));
+  return r.ok;
+}
+async function refreshDevice(){
+  const r=await api("/api/device"); const p=$("#devPill"); if(r.device) SEQ_MAX=r.device.endsWith("8890")?5:18;
+  p.textContent=r.device?t("devFound",{id:r.device}):t("devNone"); p.className="pill "+(r.device?"ok":"bad");
+}
+async function loadConfig(name){
+  const r=await api("/api/config?name="+encodeURIComponent(name));
+  if(r.error){log(apiMsg(r));return;}
+  cfg=r; cfgName=name; layer=0; sel=null; normalize(); saved=snapshot(); $("#cfgSel").value=name;
+  renderAll(); updateDirty(); validate();
+  if(cfg.orientation!=="normal") log(t("loadWarn",{o:cfg.orientation}));
+}
+async function refreshList(select){
+  const s=await api("/api/state"); const el=$("#cfgSel"); el.innerHTML="";
+  s.configs.forEach(n=>{const o=document.createElement("option");o.textContent=n;el.appendChild(o)});
+  if(select) el.value=select; return s;
+}
+async function save(name){
+  const r=await api("/api/save",{name,config:cfg});
+  if(r.error){alert(apiMsg(r));return;}
+  cfgName=name; saved=snapshot(); updateDirty(); await refreshList(name); log(t("saved",{n:name}));
+}
+
+// ---------- wiring
+function bindTop(){
+  const upd=()=>{cfg.rows=+$("#rows").value||1;cfg.columns=+$("#cols").value||1;cfg.knobs=+$("#knobsN").value||0;sel=null;normalize();changed();renderAll()};
+  ["#rows","#cols","#knobsN"].forEach(s=>$(s).onchange=upd);
+  $("#langSel").onchange=e=>setLang(e.target.value);
+  $("#cfgSel").onchange=async e=>{ if(snapshot()!==saved && !confirm(t("discard"))){e.target.value=cfgName;return;} loadConfig(e.target.value); };
+  $("#btnSave").onclick=()=>{ const n=cfgName||prompt(t("namePrompt")); if(n) save(n.trim()); };
+  $("#btnSaveAs").onclick=()=>{const n=prompt(t("saveAsPrompt"),(cfgName||t("newName"))+t("copySuffix")); if(n) save(n.trim());};
+  $("#btnNew").onclick=()=>{
+    if(snapshot()!==saved && !confirm(t("discard"))) return;
+    cfg={orientation:"normal",rows:3,columns:4,knobs:3,layers:[{buttons:[],knobs:[]},{buttons:[],knobs:[]},{buttons:[],knobs:[]}]};
+    cfgName=null; layer=0; sel=null; normalize(); saved=""; renderAll(); changed();
+  };
+  $("#btnUpload").onclick=async()=>{
+    const ok=await validate(); if(!ok){ alert(t("invalidAlert")); return; }
+    const oWarn=cfg.orientation!=="normal"?t("orientWarn",{o:cfg.orientation}):"";
+    if(!confirm(t("uploadConfirm")+oWarn)) return;
+    const b=$("#btnUpload"); b.disabled=true; b.textContent=t("uploading"); log(t("uploadingLog"));
+    const r=await api("/api/upload",{config:cfg}); b.disabled=false; b.textContent=t("upload");
+    log((r.ok?"✓ ":"✗ ")+apiMsg(r)+(r.terminal_cmd?`\n${t("termHint")}\n${r.terminal_cmd}`:"")); refreshDevice();
+  };
+  $("#btnQuit").onclick=async()=>{ if(!confirm(t("quitConfirm"))) return; try{await api("/api/quit",{});}catch(e){} document.body.innerHTML=`<p style="padding:30px;font-size:16px">${t("quitDone")}</p>`; };
+  $("#ledSel").onchange=async e=>{ if(e.target.value==="")return; const r=await api("/api/led",{index:+e.target.value}); log((r.ok?"✓ ":"✗ ")+apiMsg(r)); e.target.value=""; };
+}
+
+(async function init(){
+  applyStatic();
+  const s=await refreshList();
+  KEYS=s.keys; MEDIA=(KEYS["Media keys"]||[]).map(x=>x[0]);
+  if(!s.tool) log(t("toolMissing"));
+  bindTop(); refreshDevice(); setInterval(refreshDevice,5000);
+  const first = s.configs.find(n=>n.startsWith("starter")) || s.configs[0];
+  if(first) await loadConfig(first); else $("#editor").innerHTML=`<p class="muted">${t("pickKey")}</p>`;
+  $("#edTitle").textContent=t("editor");
+})();
+</script>
+</body>
+</html>

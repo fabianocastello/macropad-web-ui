@@ -1,0 +1,16 @@
+# Tiny example: 1 row x 2 keys, no knobs.
+orientation: normal
+rows: 1
+columns: 2
+knobs: 0
+
+layers:
+  - buttons:
+      - ["a", "b"]
+    knobs: []
+  - buttons:
+      - ["enter", "escape"]
+    knobs: []
+  - buttons:
+      - ["space", "backspace"]
+    knobs: []

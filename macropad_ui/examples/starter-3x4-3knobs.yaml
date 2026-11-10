@@ -1,0 +1,55 @@
+# Starter config for a 3x4 macro keyboard with 3 knobs (default orientation:
+# keys on the left, knobs on the right). Edit it in MacroPad UI and save under a new name.
+orientation: normal
+rows: 3
+columns: 4
+knobs: 3
+
+layers:
+  # Layer 1: editing shortcuts + desktop switching
+  - buttons:
+      - ["cmd-c", "cmd-v", "cmd-x", "cmd-z"]
+      - ["cmd-a", "cmd-s", "cmd-f", "cmd-shift-z"]
+      - ["cmd-w", "cmd-t", "cmd-tab", "escape"]
+    knobs:
+      - ccw: "ctrl-left"
+        press: "ctrl-up"
+        cw: "ctrl-right"
+      - ccw: "wheelup"
+        press: "click"
+        cw: "wheeldown"
+      - ccw: "volumedown"
+        press: "mute"
+        cw: "volumeup"
+
+  # Layer 2: mouse
+  - buttons:
+      - ["click", "rclick", "mclick", "click+rclick"]
+      - ["wheelup", "wheeldown", "shift-wheelup", "ctrl-wheelup"]
+      - ["alt-wheelup", "ctrl-click", "shift-click", "alt-click"]
+    knobs:
+      - ccw: "left"
+        press: "enter"
+        cw: "right"
+      - ccw: "up"
+        press: "enter"
+        cw: "down"
+      - ccw: "wheelup"
+        press: "click"
+        cw: "wheeldown"
+
+  # Layer 3: media
+  - buttons:
+      - ["play", "prev", "next", "mute"]
+      - ["volumedown", "volumeup", "stop", "calculator"]
+      - [null, null, null, null]
+    knobs:
+      - ccw: "volumedown"
+        press: "mute"
+        cw: "volumeup"
+      - ccw: "prev"
+        press: "play"
+        cw: "next"
+      - ccw: "wheelup"
+        press: "click"
+        cw: "wheeldown"
