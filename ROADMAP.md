@@ -5,6 +5,7 @@
 - [x] Key editor: chords, sequences, text typing, mouse, media, raw HID, capture
 - [x] One-click upload, live validation, English / Português UI
 - [x] Export a layer to a file and import it back (⤓ / ⤒ next to the layer tabs)
+- [x] Reopens on the last edited / uploaded config (including unsaved changes and the selected layer)
 - [x] macOS app builder (`scripts/make_app.sh`)
 
 ## To do

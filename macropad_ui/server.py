@@ -42,6 +42,7 @@ PORT = 8777
 TOOL = None            # Path | None
 CONFIGS = None         # Path
 DATA = None            # Path
+STATE_FILE = None      # Path: remembers the last config / working draft between runs
 
 
 # --------------------------------------------------------------------------- setup
@@ -69,6 +70,19 @@ def seed_configs():
         return
     for f in (HERE / "examples").glob("*.yaml"):
         shutil.copy(f, CONFIGS / f.name)
+
+
+def read_state():
+    try:
+        return json.loads(STATE_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def write_state(**kw):
+    st = read_state()
+    st.update(kw)
+    STATE_FILE.write_text(json.dumps(st))
 
 
 # --------------------------------------------------------------------------- YAML
@@ -227,8 +241,10 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/":
             return self._send((HERE / "index.html").read_bytes(), ctype="text/html")
         if u.path == "/api/state":
+            st = read_state()
             return self._send({"device": detect_device(), "keys": list_keys(), "tool": TOOL is not None,
-                               "platform": SYSTEM, "configs": sorted(p.stem for p in CONFIGS.glob("*.yaml"))})
+                               "platform": SYSTEM, "configs": sorted(p.stem for p in CONFIGS.glob("*.yaml")),
+                               "last": st.get("last"), "draft": st.get("draft")})
         if u.path == "/api/device":
             return self._send({"device": detect_device()})
         if u.path == "/api/config":
@@ -256,6 +272,18 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=self.server.shutdown, daemon=True).start()
             return
         try:
+            if path == "/api/last":      # remember which config was last edited / uploaded
+                name = data.get("name")
+                if name is not None and not NAME_RE.match(name):
+                    return self._err("bad_name", "Invalid name")
+                write_state(last=name)
+                return self._send({"ok": True})
+            if path == "/api/draft":     # remember the working copy (even unsaved edits)
+                cfg = data.get("config")
+                if not isinstance(cfg, dict) or not isinstance(cfg.get("layers"), list) or len(json.dumps(cfg)) > 500_000:
+                    return self._err("bad_request", "Bad draft")
+                write_state(draft={"name": data.get("name"), "config": cfg, "layer": int(data.get("layer", 0))})
+                return self._send({"ok": True})
             if path == "/api/parse":     # read a YAML text (e.g. an exported layer) without saving it
                 text = data["text"]
                 if len(text) > 500_000:
@@ -296,7 +324,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global PORT, TOOL, CONFIGS, DATA
+    global PORT, TOOL, CONFIGS, DATA, STATE_FILE
     ap = argparse.ArgumentParser(description="MacroPad UI")
     ap.add_argument("--port", type=int, default=int(os.environ.get("MACROPAD_PORT", 8777)))
     ap.add_argument("--no-open", action="store_true", help="do not open the browser")
@@ -309,6 +337,7 @@ def main():
     DATA = Path(os.environ.get("MACROPAD_DATA") or default_data_dir())
     CONFIGS = Path(a.configs) if a.configs else DATA / "configs"
     DATA.mkdir(parents=True, exist_ok=True)
+    STATE_FILE = DATA / "state.json"
     seed_configs()
 
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)

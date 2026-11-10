@@ -14,6 +14,7 @@ It draws your keyboard, lets you click a key or knob and set what it does, and u
 - **"Type text"**: turn a string like `Hello, world!` into the key sequence a key will type
 - **Capture**: press a combination on your computer's keyboard to fill it in
 - Live validation, generated-YAML preview, save/load of your own configs
+- **Reopens where you left off**: the last config you edited or uploaded (and the layer, even with unsaved changes) comes back on the next launch
 - **Export / import a layer** to a file (⤓ / ⤒ beside the layer tabs) — share a layer, or move it between configs and orientations
 - One-click upload (asks for your admin password once per upload on macOS)
 - UI in **English** and **Português** (auto-detected, switch any time)

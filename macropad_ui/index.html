@@ -186,6 +186,7 @@ en: {
   orientWarn:'\n\n⚠ Orientation: {o}. Keys and knobs will be written rotated/flipped relative to the "normal" YAML.',
   uploadConfirm:"Upload this configuration to the keyboard now?\n(macOS may ask for your password.)", uploadingLog:"Uploading to the keyboard…",
   quitConfirm:"Quit MacroPad UI? (open it again from its icon)", quitDone:"Server stopped. You can close this tab. To come back, open MacroPad UI again.",
+  restored:"Reopened where you left off: {n}",
   toolMissing:"⚠ ch57x-keyboard-tool not found. Install it (see the README) or set MACROPAD_TOOL.",
   termHint:"Alternative: run this in Terminal (it asks for your password there):",
   exportLayer:"Export this layer to a file", importLayer:"Import a layer from a file", exported:"Exported: {f}",
@@ -229,6 +230,7 @@ pt: {
   orientWarn:'\n\n⚠ Orientação: {o}. Teclas e knobs serão gravados rotacionados/invertidos em relação ao YAML "normal".',
   uploadConfirm:"Enviar esta configuração ao teclado agora?\n(O macOS pode pedir a sua senha.)", uploadingLog:"Enviando ao teclado…",
   quitConfirm:"Encerrar o MacroPad UI? (abra de novo pelo ícone)", quitDone:"Servidor encerrado. Pode fechar esta aba. Para voltar, abra o MacroPad UI de novo.",
+  restored:"Reaberto de onde você parou: {n}",
   toolMissing:"⚠ ch57x-keyboard-tool não encontrado. Instale-o (veja o README) ou defina MACROPAD_TOOL.",
   termHint:"Alternativa: rode isto no Terminal (a senha é pedida lá):",
   exportLayer:"Exportar esta camada para um arquivo", importLayer:"Importar uma camada de um arquivo", exported:"Exportado: {f}",
@@ -295,7 +297,7 @@ function renderTabs(){
   const tb=$("#tabs"); tb.innerHTML="";
   cfg.layers.forEach((_,i)=>{
     const b=document.createElement("button"); b.className="tab"+(i===layer?" on":""); b.textContent=t("layerN",{n:i+1});
-    b.onclick=()=>{layer=i;renderAll()}; tb.appendChild(b);
+    b.onclick=()=>{layer=i;renderAll();persist()}; tb.appendChild(b);
   });
   if(cfg.layers.length<3){ const a=document.createElement("button"); a.textContent="+"; a.title=t("layerAdd");
     a.onclick=()=>{cfg.layers.push(JSON.parse(JSON.stringify(cfg.layers[layer])));layer=cfg.layers.length-1;changed();renderAll()}; tb.appendChild(a); }
@@ -645,11 +647,19 @@ window.addEventListener("keyup",e=>{
   if(held.size===0 && (capMods.size||capKey)){ capturing=false; const b=$("#capBtn"); if(b){b.classList.remove("cap");b.textContent=t("capture");} }
 },true);
 
+// ---------- remember where you left off (last config / working copy), stored by the local server
+let persistTimer=null;
+function persist(){
+  clearTimeout(persistTimer);
+  persistTimer=setTimeout(()=>{ if(cfg) api("/api/draft",{name:cfgName,config:cfg,layer}).catch(()=>{}); },600);
+}
+function rememberLast(name){ if(name) api("/api/last",{name}).catch(()=>{}); }
+
 // ---------- state / dirty / yaml / validate
 function snapshot(){ return JSON.stringify(cfg); }
 function updateDirty(){ $("#dirty").textContent = cfg && snapshot()!==saved ? t("unsaved") : ""; }
 function changed(){
-  updateDirty();
+  updateDirty(); persist();
   clearTimeout(validateTimer); validateTimer=setTimeout(()=>{updateYaml();validate()},400);
 }
 async function updateYaml(){ const r=await api("/api/yaml",{config:cfg}); $("#yamlOut").textContent=r.yaml||""; }
@@ -667,7 +677,7 @@ async function loadConfig(name){
   const r=await api("/api/config?name="+encodeURIComponent(name));
   if(r.error){log(apiMsg(r));return;}
   cfg=r; cfgName=name; layer=0; sel=null; normalize(); saved=snapshot(); $("#cfgSel").value=name;
-  renderAll(); updateDirty(); validate();
+  renderAll(); updateDirty(); validate(); rememberLast(name); persist();
   if(cfg.orientation!=="normal") log(t("loadWarn",{o:cfg.orientation}));
 }
 async function refreshList(select){
@@ -678,7 +688,7 @@ async function refreshList(select){
 async function save(name){
   const r=await api("/api/save",{name,config:cfg});
   if(r.error){alert(apiMsg(r));return;}
-  cfgName=name; saved=snapshot(); updateDirty(); await refreshList(name); log(t("saved",{n:name}));
+  cfgName=name; saved=snapshot(); updateDirty(); await refreshList(name); log(t("saved",{n:name})); rememberLast(name); persist();
 }
 
 // ---------- wiring
@@ -693,7 +703,7 @@ function bindTop(){
   $("#btnNew").onclick=()=>{
     if(snapshot()!==saved && !confirm(t("discard"))) return;
     cfg={orientation:"normal",rows:3,columns:4,knobs:3,layers:[{buttons:[],knobs:[]},{buttons:[],knobs:[]},{buttons:[],knobs:[]}]};
-    cfgName=null; layer=0; sel=null; normalize(); saved=""; renderAll(); changed();
+    cfgName=null; layer=0; sel=null; normalize(); saved=""; renderAll(); changed(); $("#cfgSel").selectedIndex=-1;
   };
   $("#btnUpload").onclick=async()=>{
     const ok=await validate(); if(!ok){ alert(t("invalidAlert")); return; }
@@ -701,6 +711,7 @@ function bindTop(){
     if(!confirm(t("uploadConfirm")+oWarn)) return;
     const b=$("#btnUpload"); b.disabled=true; b.textContent=t("uploading"); log(t("uploadingLog"));
     const r=await api("/api/upload",{config:cfg}); b.disabled=false; b.textContent=t("upload");
+    if(r.ok){ rememberLast(cfgName); persist(); }
     log((r.ok?"✓ ":"✗ ")+apiMsg(r)+(r.terminal_cmd?`\n${t("termHint")}\n${r.terminal_cmd}`:"")); refreshDevice();
   };
   $("#btnQuit").onclick=async()=>{ if(!confirm(t("quitConfirm"))) return; try{await api("/api/quit",{});}catch(e){} document.body.innerHTML=`<p style="padding:30px;font-size:16px">${t("quitDone")}</p>`; };
@@ -713,8 +724,17 @@ function bindTop(){
   KEYS=s.keys; MEDIA=(KEYS["Media keys"]||[]).map(x=>x[0]);
   if(!s.tool) log(t("toolMissing"));
   bindTop(); refreshDevice(); setInterval(refreshDevice,5000);
-  const first = s.configs.find(n=>n.startsWith("starter")) || s.configs[0];
-  if(first) await loadConfig(first); else $("#editor").innerHTML=`<p class="muted">${t("pickKey")}</p>`;
+  const d=s.draft, okDraft=d&&d.config&&Array.isArray(d.config.layers)&&d.config.layers.length&&(d.name==null||s.configs.includes(d.name));
+  if(okDraft){                                   // reopen exactly where you left off (even unsaved edits)
+    cfg=d.config; cfgName=d.name||null; layer=Math.min(d.layer||0,cfg.layers.length-1); sel=null; normalize();
+    saved="";
+    if(cfgName){ const r=await api("/api/config?name="+encodeURIComponent(cfgName)); if(!r.error){ const keep=cfg; cfg=r; normalize(); saved=snapshot(); cfg=keep; } $("#cfgSel").value=cfgName; }
+    else $("#cfgSel").selectedIndex=-1;
+    renderAll(); updateDirty(); validate(); log(t("restored",{n:cfgName||t("newName")}));
+  } else {
+    const first = (s.last&&s.configs.includes(s.last)&&s.last) || s.configs.find(n=>n.startsWith("starter")) || s.configs[0];
+    if(first) await loadConfig(first); else $("#editor").innerHTML=`<p class="muted">${t("pickKey")}</p>`;
+  }
   $("#edTitle").textContent=t("editor");
 })();
 </script>
