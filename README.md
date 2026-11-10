@@ -68,6 +68,7 @@ Good to know:
 | --- | --- |
 | `Access denied (insufficient permissions)` | The tool needs admin rights. Use the password dialog, or run the `sudo` command shown in the log. |
 | `The administrator user name or password was incorrect (-60007)` | Wrong password in the macOS dialog (Touch ID isn't accepted there), or the server wasn't started from a GUI session (start it from Terminal or the `.app`, not as a background service). |
+| Upload fails and **no password dialog appears** | The server was started outside a graphical session (e.g. from an IDE or agent shell). Start it from **Terminal.app**, or run the `sudo …` command shown in the red message. |
 | `keyboard not found` | Cable not connected, or a model with other USB IDs (see the tool's README). |
 
 See [ROADMAP.md](ROADMAP.md) for what's planned.

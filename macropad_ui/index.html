@@ -80,6 +80,10 @@ main{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,1fr);gap:16
 .opick button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px;font-size:11px;max-width:112px;text-align:center;line-height:1.2}
 .opick button.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);background:var(--key-sel)}
 .opick svg{width:78px;height:62px}
+.toast{position:fixed;top:64px;right:16px;max-width:540px;z-index:20;padding:12px 34px 12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);box-shadow:0 8px 24px rgba(0,0,0,.35);white-space:pre-line}
+.toast.ok{border-color:var(--ok)} .toast.bad{border-color:var(--bad)}
+.toast code{display:block;margin:8px 0;padding:6px 8px;background:var(--key);border-radius:6px;font:12px ui-monospace,Menlo,monospace;word-break:break-all;user-select:all;white-space:normal}
+.toast .x{position:absolute;top:2px;right:4px;border:none;background:none;font-size:18px;padding:2px 8px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:12px;color:var(--muted)}
 .legend i{display:inline-block;width:18px;height:4px;border-radius:3px;vertical-align:middle;margin-right:5px}
 .pv{font-size:15px;font-weight:600;margin:6px 0 0;min-height:22px}
@@ -99,6 +103,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:8
 </style>
 </head>
 <body>
+<div id="toast" class="toast" hidden></div>
 <header>
   <h1>⌨️ MacroPad UI</h1>
   <select id="cfgSel" data-i-title="cfgTitle"></select>
@@ -188,6 +193,9 @@ en: {
   quitConfirm:"Quit MacroPad UI? (open it again from its icon)", quitDone:"Server stopped. You can close this tab. To come back, open MacroPad UI again.",
   restored:"Reopened where you left off: {n}",
   toolMissing:"⚠ ch57x-keyboard-tool not found. Install it (see the README) or set MACROPAD_TOOL.",
+  toastOk:"Uploaded to the keyboard ✓ ({time})", toastFail:"Upload FAILED", toastCopy:"Copy command", toastCopied:"Copied ✓",
+  toastNoGui:"This server isn't running in a graphical session, so macOS can't show the password dialog (this happens when it is started from an IDE / agent shell). Start it from Terminal.app, or run the command below in Terminal.app:",
+  toastCmd:"Run this in Terminal.app (it asks for your password there):",
   termHint:"Alternative: run this in Terminal (it asks for your password there):",
   exportLayer:"Export this layer to a file", importLayer:"Import a layer from a file", exported:"Exported: {f}",
   importWhich:"The file has {n} layers. Which one to import (1-{n})?", importConfirm:"Replace layer {n} with the imported layer?{extra}",
@@ -232,6 +240,9 @@ pt: {
   quitConfirm:"Encerrar o MacroPad UI? (abra de novo pelo ícone)", quitDone:"Servidor encerrado. Pode fechar esta aba. Para voltar, abra o MacroPad UI de novo.",
   restored:"Reaberto de onde você parou: {n}",
   toolMissing:"⚠ ch57x-keyboard-tool não encontrado. Instale-o (veja o README) ou defina MACROPAD_TOOL.",
+  toastOk:"Enviado ao teclado ✓ ({time})", toastFail:"Envio FALHOU", toastCopy:"Copiar comando", toastCopied:"Copiado ✓",
+  toastNoGui:"Este servidor não está numa sessão gráfica, então o macOS não consegue mostrar a janela de senha (acontece quando ele é iniciado de um terminal de IDE / agente). Inicie-o pelo Terminal.app, ou rode o comando abaixo no Terminal.app:",
+  toastCmd:"Rode isto no Terminal.app (a senha é pedida lá):",
   termHint:"Alternativa: rode isto no Terminal (a senha é pedida lá):",
   exportLayer:"Exportar esta camada para um arquivo", importLayer:"Importar uma camada de um arquivo", exported:"Exportado: {f}",
   importWhich:"O arquivo tem {n} camadas. Qual importar (1-{n})?", importConfirm:"Substituir a camada {n} pela camada importada?{extra}",
@@ -691,6 +702,18 @@ async function save(name){
   cfgName=name; saved=snapshot(); updateDirty(); await refreshList(name); log(t("saved",{n:name})); rememberLast(name); persist();
 }
 
+// ---------- visible feedback (upload result etc.)
+function toast(kind, msg, cmd){
+  const el=$("#toast"); el.className="toast "+kind; el.hidden=false; el.innerHTML="";
+  const m=document.createElement("div"); m.textContent=msg; el.appendChild(m);
+  if(cmd){ const c=document.createElement("code"); c.textContent=cmd; el.appendChild(c);
+    const b=document.createElement("button"); b.textContent=t("toastCopy");
+    b.onclick=async()=>{ try{ await navigator.clipboard.writeText(cmd); b.textContent=t("toastCopied"); }catch(e){ const r=document.createRange(); r.selectNodeContents(c); const s=getSelection(); s.removeAllRanges(); s.addRange(r); } };
+    el.appendChild(b); }
+  const x=document.createElement("button"); x.className="x"; x.textContent="×"; x.onclick=()=>{el.hidden=true}; el.appendChild(x);
+  clearTimeout(toast.t); if(kind==="ok") toast.t=setTimeout(()=>{el.hidden=true},6000);
+}
+
 // ---------- wiring
 function bindTop(){
   const upd=()=>{cfg.rows=+$("#rows").value||1;cfg.columns=+$("#cols").value||1;cfg.knobs=+$("#knobsN").value||0;sel=null;normalize();changed();renderAll()};
@@ -711,11 +734,13 @@ function bindTop(){
     if(!confirm(t("uploadConfirm")+oWarn)) return;
     const b=$("#btnUpload"); b.disabled=true; b.textContent=t("uploading"); log(t("uploadingLog"));
     const r=await api("/api/upload",{config:cfg}); b.disabled=false; b.textContent=t("upload");
-    if(r.ok){ rememberLast(cfgName); persist(); }
+    if(r.ok){ rememberLast(cfgName); persist(); toast("ok", t("toastOk",{time:new Date().toLocaleTimeString()})); }
+    else { const first=(apiMsg(r)||"").split("\n").filter(Boolean).slice(0,3).join(" · ");
+           toast("bad", `${t("toastFail")}\n${first}`+(r.gui===false?`\n\n${t("toastNoGui")}`:(r.terminal_cmd?`\n\n${t("toastCmd")}`:"")), r.terminal_cmd); }
     log((r.ok?"✓ ":"✗ ")+apiMsg(r)+(r.terminal_cmd?`\n${t("termHint")}\n${r.terminal_cmd}`:"")); refreshDevice();
   };
   $("#btnQuit").onclick=async()=>{ if(!confirm(t("quitConfirm"))) return; try{await api("/api/quit",{});}catch(e){} document.body.innerHTML=`<p style="padding:30px;font-size:16px">${t("quitDone")}</p>`; };
-  $("#ledSel").onchange=async e=>{ if(e.target.value==="")return; const r=await api("/api/led",{index:+e.target.value}); log((r.ok?"✓ ":"✗ ")+apiMsg(r)); e.target.value=""; };
+  $("#ledSel").onchange=async e=>{ if(e.target.value==="")return; const r=await api("/api/led",{index:+e.target.value}); log((r.ok?"✓ ":"✗ ")+apiMsg(r)); if(!r.ok) toast("bad", `${t("toastFail")}\n${(apiMsg(r)||"").split("\n")[0]}`); e.target.value=""; };
 }
 
 (async function init(){

@@ -187,6 +187,16 @@ def list_keys():
     return sections
 
 
+def gui_session():
+    """macOS only: the admin password dialog needs a graphical (Aqua) session."""
+    if SYSTEM != "Darwin":
+        return True
+    try:
+        return subprocess.run(["launchctl", "managername"], capture_output=True, text=True, timeout=5).stdout.strip() == "Aqua"
+    except Exception:
+        return True
+
+
 def mac_admin_run(args):
     """Run the tool with administrator rights through the native macOS password dialog."""
     cmd = shlex.quote(str(TOOL)) + " --vendor-id " + VENDOR + " " + " ".join(shlex.quote(a) for a in args) + " 2>&1"
@@ -309,7 +319,9 @@ class Handler(BaseHTTPRequestHandler):
                 resp = {"ok": code == 0, "message": out}
                 if code == 0:
                     resp["code"] = "uploaded"
-                elif TOOL is not None:
+                else:
+                    resp["gui"] = gui_session()
+                if code != 0 and TOOL is not None:
                     last = DATA / "last_upload.yaml"
                     last.write_text(text)
                     resp["terminal_cmd"] = f"sudo {shlex.quote(str(TOOL))} --vendor-id {VENDOR} upload {shlex.quote(str(last))}"
@@ -317,7 +329,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/led":
                 idx = int(data.get("index", 0))
                 code, out = privileged(["led", str(idx)])
-                return self._send({"ok": code == 0, "message": out, "code": "led_set" if code == 0 else None, "index": idx})
+                return self._send({"ok": code == 0, "message": out, "code": "led_set" if code == 0 else None, "index": idx,
+                                   **({"gui": gui_session()} if code != 0 else {})})
         except (KeyError, TypeError, ValueError) as e:
             return self._err("bad_request", f"Bad request: {e}")
         self._err("not_found", "not found", 404)
@@ -345,6 +358,9 @@ def main():
     print(f"MacroPad UI running at {url}  (Ctrl+C to quit)")
     print(f"  tool:    {TOOL or 'NOT FOUND - install ch57x-keyboard-tool or set MACROPAD_TOOL'}")
     print(f"  configs: {CONFIGS}")
+    if not gui_session():
+        print("  WARNING: not running in a graphical session - the macOS password dialog cannot appear.\n"
+              "           Start the server from Terminal.app (not from an IDE/agent shell).")
     if not a.no_open:
         webbrowser.open(url)
     try:
