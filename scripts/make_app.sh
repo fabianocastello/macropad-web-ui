@@ -21,9 +21,16 @@ while [ $# -gt 0 ]; do
 done
 
 [ "$(uname)" = "Darwin" ] || { echo "This script builds a macOS app; run it on a Mac."; exit 1; }
-PY="$(command -v python3 || true)"
-[ -n "$PY" ] || { echo "python3 not found."; exit 1; }
-"$PY" -c "import yaml" 2>/dev/null || { echo "PyYAML is missing for $PY. Run:  $PY -m pip install pyyaml"; exit 1; }
+# Python that runs the server: macOS' own /usr/bin/python3 when present (no conda/brew needed)
+PY=""; for c in /usr/bin/python3 "$(command -v python3 || true)"; do
+  [ -n "$c" ] && [ -x "$c" ] && "$c" -c "import sys; assert sys.version_info >= (3, 8)" 2>/dev/null && { PY="$c"; break; }
+done
+[ -n "$PY" ] || { echo "python3 (3.8+) not found."; exit 1; }
+# PyYAML (pure-Python) is copied into the app, so the app needs no pip packages
+YAMLDIR=""; for c in "$(command -v python3 || true)" /opt/homebrew/bin/python3 "$HOME/miniconda3/bin/python3" /usr/local/bin/python3 "$PY"; do
+  [ -n "$c" ] && [ -x "$c" ] && d="$("$c" -c "import yaml,os; print(os.path.dirname(yaml.__file__))" 2>/dev/null)" && { YAMLDIR="$d"; break; }
+done
+[ -n "$YAMLDIR" ] || { echo "PyYAML not found in any Python. Run:  pip3 install pyyaml  and retry."; exit 1; }
 
 TOOL=""
 for c in "${MACROPAD_TOOL:-}" "$ROOT/bin/ch57x-keyboard-tool" "$(command -v ch57x-keyboard-tool || true)" \
@@ -74,6 +81,8 @@ if [ -n "$TOOL" ]; then
   cp "$TOOL" "$APP/Contents/Resources/ch57x-keyboard-tool"
 fi
 rsync -a --exclude '__pycache__' "$ROOT/macropad_ui/" "$APP/Contents/Resources/macropad_ui/"
+mkdir -p "$APP/Contents/Resources/macropad_ui/vendor"
+rsync -a --exclude '__pycache__' --exclude '*.so' "$YAMLDIR/" "$APP/Contents/Resources/macropad_ui/vendor/yaml/"
 
 # 3) icon
 ICONSET="$WORK/icon.iconset"; mkdir -p "$ICONSET"

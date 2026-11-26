@@ -53,8 +53,8 @@ scripts/make_app.sh --install     # builds ./build/MacroPad UI.app and copies it
 ```
 
 Without `--install` the app is just built into `./build/`; drag it to `/Applications` (or the Dock) yourself.
-The app bundles the UI/server, remembers where Python and the tool are, and starts the local server when opened. Use the ⏻ button in the page to stop it.
-Rebuild it if you move or reinstall Python or the tool.
+The app is self-contained: it bundles the UI/server, PyYAML and the tool, and runs on the Python that ships with macOS (`/usr/bin/python3`, from the Xcode Command Line Tools), so it works on any Mac without pip installs. It starts the local server when opened. Use the ⏻ button in the page to stop it.
+Build it on a machine that has PyYAML (`pip3 install pyyaml`) and the tool; the resulting `.app` can then be copied to other Macs.
 
 ## Using it
 

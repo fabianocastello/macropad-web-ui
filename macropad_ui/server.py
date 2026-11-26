@@ -24,6 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+sys.path.append(str(Path(__file__).resolve().parent / "vendor"))  # bundled PyYAML (standalone .app)
 try:
     import yaml
 except ImportError:  # pragma: no cover
